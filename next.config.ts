@@ -8,6 +8,13 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        // PERBAIKAN DI SINI
+        protocol: 'https',             // Diubah dari 'www'
+        hostname: 'img.freepik.com',    // Diubah menjadi hostname gambar Freepik
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
 };
