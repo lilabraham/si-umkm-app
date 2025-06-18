@@ -1,8 +1,9 @@
 // src/pages/api/admin/login.ts
+// KODE YANG SUDAH DIPERBAIKI
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import jwt from 'jsonwebtoken';
-import cookie from 'cookie';
+import * as cookie from 'cookie'; // PERBAIKAN: Impor library cookie dengan cara yang benar
 
 export default function handler(
   req: NextApiRequest,
