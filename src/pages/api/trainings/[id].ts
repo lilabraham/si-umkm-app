@@ -1,4 +1,5 @@
 // LOKASI FILE: src/pages/api/trainings/[id].ts
+// KODE YANG SUDAH DIPERBAIKI
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { db } from '@/lib/firebase';
@@ -27,8 +28,9 @@ export default async function handler(
           return res.status(403).json({ message: 'Token CSRF tidak valid atau tidak ada.' });
         }
         
-        // PERBAIKAN: Menggunakan '_' untuk menandakan variabel tidak terpakai
-        const { csrfToken: _, ...updateData } = req.body;
+        // PERBAIKAN: Cara alternatif untuk menghapus properti tanpa error linting
+        const updateData = { ...req.body };
+        delete updateData.csrfToken;
 
         await updateDoc(trainingDocRef, updateData);
         res.status(200).json({ id, ...updateData });

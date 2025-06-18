@@ -1,13 +1,12 @@
 // LOKASI FILE: src/lib/sanitize.ts
+// KODE YANG SUDAH DIPERBAIKI (FINAL)
 
 import { JSDOM } from 'jsdom';
 import DOMPurify from 'dompurify';
 
 const window = new JSDOM('').window;
 
-// PERBAIKAN: Gunakan @ts-ignore untuk melewati pemeriksaan tipe yang terlalu ketat
-// Ini adalah praktik yang aman dan wajar untuk kasus ketidakcocokan tipe antar library seperti ini.
-// @ts-ignore 
+// PERBAIKAN: Komentar @ts-expect-error dihapus karena tidak ada type error.
 const purify = DOMPurify(window);
 
 // Fungsi ini akan menerima sebuah string dan mengembalikan versi bersihnya

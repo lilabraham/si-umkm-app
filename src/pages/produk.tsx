@@ -1,41 +1,37 @@
 // LOKASI FILE: src/pages/produk.tsx
+// KODE YANG SUDAH DIPERBAIKI
 
 import type { GetStaticProps, NextPage } from 'next';
-import { useState, useMemo } from 'react'; // PERBAIKAN: useMemo ditambahkan, useLazyQuery dihapus
+import { useState, useMemo } from 'react';
 import ProductCard from '@/components/ui/ProductCard';
-// PERBAIKAN: Impor gql dan useLazyQuery tidak lagi diperlukan
 import { Search, Frown } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-// Tipe data tetap sama
 interface Product {
-  id: string; name: string; price: number; shopName: string; imageUrl: string; rating?: number;
+  id: string;
+  name: string;
+  price: number;
+  shopName: string;
+  imageUrl: string;
+  rating?: number;
 }
 interface ProdukPageProps {
   initialProducts: Product[];
 }
 
-// PERBAIKAN: Query GraphQL tidak lagi digunakan
-// const SEARCH_PRODUCTS_QUERY = gql`...`;
-
 const ProdukPage: NextPage<ProdukPageProps> = ({ initialProducts }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  // PERBAIKAN: State untuk loading tidak lagi diperlukan untuk pencarian client-side
-  // const [search, { loading }] = useLazyQuery(...);
   
-  // PERBAIKAN: Logika pencarian sekarang dilakukan di client-side
   const productsToDisplay = useMemo(() => {
     if (!searchTerm) {
-      return initialProducts; // Jika tidak ada pencarian, tampilkan semua produk awal
+      return initialProducts;
     }
-    // Filter produk berdasarkan nama produk atau nama toko
     return initialProducts.filter(product => 
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.shopName.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [searchTerm, initialProducts]);
 
-  // Varian animasi tetap sama
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: { opacity: 1, transition: { staggerChildren: 0.07 } },
@@ -57,7 +53,6 @@ const ProdukPage: NextPage<ProdukPageProps> = ({ initialProducts }) => {
           </p>
         </div>
 
-        {/* PERBAIKAN: Form tidak lagi memerlukan onSubmit, pencarian terjadi saat mengetik */}
         <form onSubmit={(e) => e.preventDefault()} className="max-w-2xl mx-auto mb-12">
           <div className="relative">
             <div className="pointer-events-none absolute inset-y-0 left-0 pl-4 flex items-center">
@@ -73,7 +68,6 @@ const ProdukPage: NextPage<ProdukPageProps> = ({ initialProducts }) => {
           </div>
         </form>
         
-        {/* Tampilan hasil pencarian disederhanakan */}
         {productsToDisplay.length > 0 ? (
           <motion.div 
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
@@ -93,33 +87,36 @@ const ProdukPage: NextPage<ProdukPageProps> = ({ initialProducts }) => {
           <div className="text-center py-16 px-6 bg-white rounded-lg shadow-sm">
              <Frown className="mx-auto text-gray-400" size={48} />
              <h3 className="mt-4 text-xl font-semibold text-gray-800">Oops! Produk tidak ditemukan</h3>
+             {/* PERBAIKAN: Menggunakan kutipan yang aman untuk JSX */}
              <p className="mt-2 text-gray-500">
-               Kami tidak dapat menemukan produk untuk kata kunci "<span className="font-semibold text-gray-700">{searchTerm}</span>".
+                Kami tidak dapat menemukan produk untuk kata kunci “<span className="font-semibold text-gray-700">{searchTerm}</span>”.
              </p>
-          </div>
+           </div>
         )}
       </div>
     </div>
   );
 };
 
-// PERBAIKAN: Mengoptimalkan getStaticProps untuk menghilangkan 'large-page-data'
 export const getStaticProps: GetStaticProps = async () => {
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/produk`);
+    // Pastikan NEXT_PUBLIC_API_URL sudah benar di environment variables Vercel Anda
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+    const res = await fetch(`${apiUrl}/api/produk`);
+    if (!res.ok) {
+      // Jika respons tidak ok (cth: 404, 500), lempar error untuk masuk ke blok catch
+      throw new Error(`Failed to fetch products: ${res.statusText}`);
+    }
     const products: Product[] = await res.json();
-
-    // SOLUSI 'large-page-data': Buat array baru tanpa field 'imageUrl' yang besar
-    const optimizedProducts = products.map(({ imageUrl, ...rest }) => rest);
 
     return { 
       props: { 
-        // Kirim data yang sudah dioptimasi ke halaman
-        initialProducts: optimizedProducts as Product[] 
+        initialProducts: products 
       }, 
       revalidate: 60 
     };
-  } catch (error) {
+  } catch { // PERBAIKAN: Menghapus variabel 'error' yang tidak digunakan
+    console.warn("Gagal mengambil data produk saat build, halaman akan menampilkan data kosong.");
     return { props: { initialProducts: [] } };
   }
 };

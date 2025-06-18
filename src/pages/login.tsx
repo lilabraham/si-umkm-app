@@ -1,6 +1,6 @@
 // LOKASI FILE: src/pages/login.tsx
 
-import { useState, FormEvent, useEffect } from 'react'; // PERBAIKAN: Menghapus 'ChangeEvent' yang tidak terpakai
+import { useState, useEffect } from 'react'; // PERBAIKAN: Menghapus 'ChangeEvent' yang tidak terpakai
 import { useRouter } from 'next/router';
 import { useAuth } from '@/context/AuthContext';
 import { auth } from '@/lib/firebase';

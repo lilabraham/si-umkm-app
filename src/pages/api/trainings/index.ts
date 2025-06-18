@@ -1,4 +1,5 @@
 // LOKASI FILE: src/pages/api/trainings/index.ts
+// KODE YANG SUDAH DIPERBAIKI
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { db } from '@/lib/firebase';
@@ -12,7 +13,7 @@ export interface Training {
   schedule: string;
   location: string;
   organizer: string;
-  createdAt?: { seconds: number; nanoseconds: number; }; // PERBAIKAN: Memberi tipe yang lebih spesifik
+  createdAt?: { seconds: number; nanoseconds: number; };
 }
 
 export default async function handler(
@@ -46,8 +47,10 @@ export default async function handler(
           return res.status(403).json({ message: 'Token CSRF tidak valid atau tidak ada.' });
         }
         
-        // PERBAIKAN: Menghapus variabel 'csrfToken' yang tidak terpakai
-        const { csrfToken: _, ...trainingData } = req.body;
+        // PERBAIKAN: Cara alternatif untuk menghapus properti tanpa error linting
+        const trainingData = { ...req.body };
+        delete trainingData.csrfToken;
+        
         const { title, description, schedule, location, organizer } = trainingData;
         
         if (!title || !description || !schedule || !location || !organizer) {
