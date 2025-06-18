@@ -1,4 +1,10 @@
 @import "tailwindcss";
+/* src/app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* CSS kustom Anda lainnya bisa diletakkan di bawahnya */
 
 :root {
   --background: #fffcfc; /* White Smoke Gray */

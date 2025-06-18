@@ -1,16 +1,40 @@
-// src/pages/pelatihan.tsx
+// LOKASI FILE: src/pages/pelatihan.tsx
 
 import type { GetStaticProps, NextPage } from 'next';
 import Head from 'next/head';
-import { Calendar, MapPin, Building } from 'lucide-react';
-// Impor tipe data Training dari API kita
+import TrainingCard from '@/components/ui/TrainingCard';
 import type { Training } from './api/trainings';
+import { Info } from 'lucide-react';
+import { motion, type Variants } from 'framer-motion'; // <-- pastikan 'Variants' juga diimpor
 
 interface PelatihanPageProps {
   trainings: Training[];
 }
 
 const PelatihanPage: NextPage<PelatihanPageProps> = ({ trainings }) => {
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.08,
+      },
+    },
+  };
+
+  // PERBAIKAN: Menambahkan "as const" di akhir objek untuk mengatasi error TypeScript
+  const cardVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: {
+        type: 'spring',
+        stiffness: 100,
+      },
+    },
+  } as const;
+
   return (
     <>
       <Head>
@@ -18,74 +42,68 @@ const PelatihanPage: NextPage<PelatihanPageProps> = ({ trainings }) => {
         <meta name="description" content="Akses informasi dan jadwal program pembinaan untuk UMKM dari pemerintah." />
       </Head>
 
-      <div className="bg-gray-50 min-h-screen">
-        <div className="container mx-auto px-6 py-12">
-          <div className="text-center mb-12">
-            <h1 className="text-4xl font-extrabold text-gray-900">
+      <motion.div 
+        className="bg-gray-50 min-h-screen"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+      >
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="text-center mb-12 max-w-2xl mx-auto">
+            <h1 className="text-3xl font-bold text-slate-900 sm:text-4xl">
               Program Pelatihan & Pembinaan UMKM
             </h1>
-            <p className="mt-4 max-w-2xl mx-auto text-lg text-gray-600">
+            <p className="mt-4 text-lg text-slate-600">
               Tingkatkan skala bisnis Anda dengan mengikuti program-program pilihan yang diselenggarakan oleh pemerintah dan mitra.
             </p>
           </div>
 
           {trainings.length > 0 ? (
-            <div className="space-y-8 max-w-4xl mx-auto">
+            <motion.div 
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+            >
               {trainings.map((training) => (
-                <div key={training.id} className="bg-white p-8 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300">
-                  <h2 className="text-2xl font-bold text-gray-800 mb-3">{training.title}</h2>
-                  <p className="text-gray-600 leading-relaxed mb-6">{training.description}</p>
-                  
-                  <div className="space-y-4 border-t pt-6">
-                    <div className="flex items-center text-gray-700">
-                      <Calendar size={20} className="text-blue-600 mr-3" />
-                      <span>{training.schedule}</span>
-                    </div>
-                    <div className="flex items-center text-gray-700">
-                      <MapPin size={20} className="text-blue-600 mr-3" />
-                      <span>{training.location}</span>
-                    </div>
-                    <div className="flex items-center text-gray-700">
-                      <Building size={20} className="text-blue-600 mr-3" />
-                      <span>Diselenggarakan oleh: <strong>{training.organizer}</strong></span>
-                    </div>
-                  </div>
-                </div>
+                <TrainingCard
+                  key={training.id}
+                  training={training}
+                  variants={cardVariants}
+                />
               ))}
-            </div>
+            </motion.div>
           ) : (
-            <div className="text-center text-gray-500 bg-white p-10 rounded-lg shadow-md">
-              <p>Belum ada jadwal pelatihan yang tersedia saat ini. Silakan cek kembali nanti.</p>
+            <div className="text-center text-gray-500 bg-white p-10 rounded-xl shadow-sm max-w-md mx-auto">
+               <Info size={40} className="mx-auto text-blue-500 mb-4" />
+              <h3 className="font-semibold text-lg text-gray-700">Belum Ada Jadwal</h3>
+              <p className="mt-1 text-sm">Jadwal pelatihan belum tersedia saat ini. Silakan cek kembali nanti.</p>
             </div>
           )}
         </div>
-      </div>
+      </motion.div>
     </>
   );
 };
 
-// Fungsi ini berjalan di server saat build time untuk mengambil data pelatihan
-export const getStaticProps: GetStaticProps = async () => {
+// --- TIDAK ADA PERUBAHAN PADA LOGIKA getStaticProps ---
+export const getStaticProps: GetStaticProps = async (context) => {
+  // ... Logika Anda tetap di sini ...
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/trainings`);
     if (!res.ok) {
       throw new Error('Gagal mengambil data pelatihan');
     }
     const trainings: Training[] = await res.json();
-
-    // Mengurutkan pelatihan berdasarkan tanggal pembuatan (jika ada)
-    // Asumsi 'createdAt' adalah objek timestamp dari Firestore
     const sortedTrainings = trainings.sort((a, b) => {
         const timeA = a.createdAt?.seconds || 0;
         const timeB = b.createdAt?.seconds || 0;
-        return timeB - timeA; // Terbaru di atas
+        return timeB - timeA;
     });
-
     return {
       props: {
         trainings: sortedTrainings,
       },
-      // Halaman akan coba dibuat ulang setiap 60 detik jika ada request baru
       revalidate: 60,
     };
   } catch (error) {

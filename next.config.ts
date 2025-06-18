@@ -9,12 +9,20 @@ const nextConfig = {
         pathname: '/**',
       },
       {
-        // PERBAIKAN DI SINI
-        protocol: 'https',             // Diubah dari 'www'
-        hostname: 'img.freepik.com',    // Diubah menjadi hostname gambar Freepik
+        protocol: 'https',
+        hostname: 'img.freepik.com',
         port: '',
         pathname: '/**',
       },
+      // ==========================================================
+      // PERUBAHAN DI SINI: Menambahkan konfigurasi untuk placehold.co
+      {
+        protocol: 'https',
+        hostname: 'placehold.co',
+        port: '',
+        pathname: '/**',
+      },
+      // ==========================================================
     ],
   },
 };
