@@ -1,4 +1,4 @@
-// src/pages/api/graphql.ts
+// LOKASI FILE: src/pages/api/graphql.ts
 
 import { ApolloServer } from '@apollo/server';
 import { startServerAndCreateNextHandler } from '@as-integrations/next';
@@ -6,7 +6,6 @@ import { gql } from 'graphql-tag';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, query } from 'firebase/firestore';
 
-// Definisikan tipe data Product kita di sini agar konsisten
 interface Product {
   id: string;
   name: string;
@@ -17,10 +16,7 @@ interface Product {
   ownerId: string;
 }
 
-// 1. Definisikan Skema GraphQL (Struktur Data)
-// Skema ini memberi tahu GraphQL data seperti apa yang kita miliki
 const typeDefs = gql`
-  # Ini adalah tipe data untuk sebuah produk
   type Product {
     id: ID!
     name: String
@@ -31,20 +27,14 @@ const typeDefs = gql`
     ownerId: String
   }
 
-  # Ini adalah query (pertanyaan) yang bisa diajukan oleh client
   type Query {
-    # Mengambil semua produk
     allProducts: [Product]
-    # Mencari produk berdasarkan nama
     searchProducts(term: String!): [Product]
   }
 `;
 
-// 2. Definisikan Resolvers (Logika untuk Menjawab Query)
-// Ini adalah fungsi yang akan dijalankan saat sebuah query diterima
 const resolvers = {
   Query: {
-    // Resolver untuk query 'allProducts'
     allProducts: async (): Promise<Product[]> => {
       try {
         const productsCollection = collection(db, 'products');
@@ -59,15 +49,12 @@ const resolvers = {
         return [];
       }
     },
-    // Resolver untuk query 'searchProducts'
-    searchProducts: async (_: any, { term }: { term: string }): Promise<Product[]> => {
+    searchProducts: async (_: unknown, { term }: { term: string }): Promise<Product[]> => { // PERBAIKAN: Mengganti 'any' dengan 'unknown'
       try {
         if (!term) {
-          return []; // Kembalikan array kosong jika tidak ada term pencarian
+          return [];
         }
         
-        // Ambil semua produk, lalu filter di sisi server
-        // Ini adalah cara sederhana. Untuk aplikasi besar, gunakan layanan pencarian seperti Algolia/Elasticsearch
         const productsCollection = collection(db, 'products');
         const productSnapshot = await getDocs(query(productsCollection));
         const allProducts = productSnapshot.docs.map(doc => ({
@@ -91,11 +78,9 @@ const resolvers = {
   },
 };
 
-// 3. Buat instance Apollo Server
 const server = new ApolloServer({
   typeDefs,
   resolvers,
 });
 
-// 4. Hubungkan server dengan Next.js
 export default startServerAndCreateNextHandler(server);

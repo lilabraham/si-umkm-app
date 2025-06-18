@@ -1,9 +1,9 @@
-// src/pages/api/trainings/[id].ts
+// LOKASI FILE: src/pages/api/trainings/[id].ts
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import cookie from 'cookie'; // Impor library cookie
+import cookie from 'cookie';
 
 export default async function handler(
   req: NextApiRequest,
@@ -19,7 +19,6 @@ export default async function handler(
   switch (req.method) {
     case 'PUT':
       try {
-        // ================== VALIDASI CSRF DIMULAI ==================
         const cookies = cookie.parse(req.headers.cookie || '');
         const csrfTokenFromCookie = cookies.csrf_token;
         const csrfTokenFromBody = req.body.csrfToken;
@@ -27,10 +26,9 @@ export default async function handler(
         if (!csrfTokenFromCookie || !csrfTokenFromBody || csrfTokenFromCookie !== csrfTokenFromBody) {
           return res.status(403).json({ message: 'Token CSRF tidak valid atau tidak ada.' });
         }
-        // ========================================================
-
-        // Hapus csrfToken dari data sebelum diperbarui
-        const { csrfToken, ...updateData } = req.body;
+        
+        // PERBAIKAN: Menggunakan '_' untuk menandakan variabel tidak terpakai
+        const { csrfToken: _, ...updateData } = req.body;
 
         await updateDoc(trainingDocRef, updateData);
         res.status(200).json({ id, ...updateData });
@@ -40,9 +38,6 @@ export default async function handler(
       break;
 
     case 'DELETE':
-      // Proses hapus biasanya tidak memerlukan proteksi CSRF seketat form,
-      // karena dikonfirmasi melalui dialog `window.confirm`.
-      // Namun, bisa ditambahkan jika ingin keamanan ekstra.
       try {
         await deleteDoc(trainingDocRef);
         res.status(204).end();

@@ -5,10 +5,8 @@ import withAuth from "@/components/common/withAuth";
 import { useAuth } from "@/context/AuthContext";
 import { UploadCloud, Edit, Trash2, X as CloseIcon, Image as ImageIcon, Loader2 } from 'lucide-react';
 import Image from 'next/image';
-// ANIMASI: Impor Framer Motion
 import { motion, AnimatePresence } from 'framer-motion';
 
-// --- TIDAK ADA PERUBAHAN PADA LOGIKA, STATE, ATAU INTERFACE ---
 interface Product {
   id: string; 
   name: string; 
@@ -87,11 +85,14 @@ function DashboardPage() {
       setMessage({ type: 'success', text: `Produk "${newProduct.name}" berhasil ditambahkan!` });
       setMyProducts(prev => [newProduct, ...prev]);
       setProductName(''); setProductPrice(''); setProductDescription(''); setShopName(''); setImageBase64(null);
-      if (document.getElementById('imageFile')) {
-        (document.getElementById('imageFile') as HTMLInputElement).value = '';
+      const imageFileInput = document.getElementById('imageFile') as HTMLInputElement;
+      if (imageFileInput) {
+        imageFileInput.value = '';
       }
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message || 'Terjadi kesalahan.' });
+    } catch (error) {
+      if (error instanceof Error) {
+        setMessage({ type: 'error', text: error.message || 'Terjadi kesalahan.' });
+      }
     } finally {
       setLoading(false);
     }
@@ -104,8 +105,10 @@ function DashboardPage() {
       if (!response.ok) throw new Error('Gagal menghapus produk.');
       setMyProducts(prev => prev.filter(p => p.id !== productId));
       setMessage({ type: 'success', text: 'Produk berhasil dihapus.' });
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message || 'Gagal menghapus produk.' });
+    } catch (error) {
+      if (error instanceof Error) {
+        setMessage({ type: 'error', text: error.message || 'Gagal menghapus produk.' });
+      }
     }
   };
 
@@ -135,15 +138,15 @@ function DashboardPage() {
       setMyProducts(prev => prev.map(p => p.id === id ? updatedProduct : p));
       setIsEditModalOpen(false);
       setMessage({ type: 'success', text: 'Produk berhasil diperbarui!' });
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message || 'Terjadi kesalahan.' });
+    } catch (error) {
+      if (error instanceof Error) {
+        setMessage({ type: 'error', text: error.message || 'Terjadi kesalahan.' });
+      }
     } finally {
       setLoading(false);
     }
   };
-  // --- AKHIR DARI LOGIKA TIDAK DIUBAH ---
 
-  // ANIMASI: Mendefinisikan varian untuk animasi stagger
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
@@ -168,19 +171,16 @@ function DashboardPage() {
           <p className="text-slate-500">Selamat datang, {currentUser?.email}. Kelola produk Anda di sini.</p>
         </motion.div>
         
-        {/* ANIMASI: Layout utama dengan stagger effect */}
         <motion.div 
             className="grid grid-cols-1 lg:grid-cols-5 gap-8"
             variants={containerVariants}
             initial="hidden"
             animate="visible"
         >
-          {/* ANIMASI: Kolom form dengan animasi item */}
           <motion.div variants={itemVariants} className="lg:col-span-2">
             <div className="bg-white shadow-md rounded-xl p-6 h-fit sticky top-24">
               <h2 className="text-xl font-semibold mb-4 text-slate-800">Tambah Produk Baru</h2>
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* ... input fields (tidak perlu animasi individual) ... */}
                 <div>
                   <label htmlFor="shopName" className="text-sm font-medium text-gray-700 mb-1 block">Nama Toko</label>
                   <input type="text" id="shopName" value={shopName} onChange={(e) => setShopName(e.target.value)} className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition" required />
@@ -195,7 +195,7 @@ function DashboardPage() {
                 </div>
                 <div>
                   <label htmlFor="productDescription" className="text-sm font-medium text-gray-700 mb-1 block">Deskripsi Produk</label>
-                  <textarea id="productDescription" value={productDescription} onChange={(e) => setProductDescription(e.target.value as any)} rows={4} className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition resize-none" required></textarea>
+                  <textarea id="productDescription" value={productDescription} onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setProductDescription(e.target.value)} rows={4} className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition resize-none" required></textarea>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-700 mb-1 block">Foto Produk</label>
@@ -212,16 +212,13 @@ function DashboardPage() {
             </div>
           </motion.div>
 
-          {/* ANIMASI: Kolom daftar produk dengan animasi item */}
           <motion.div variants={itemVariants} className="lg:col-span-3">
             <h2 className="text-xl font-semibold mb-4 text-slate-800">Daftar Produk Anda</h2>
             {productsLoading ? (
               <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin text-blue-500" size={32}/></div>
             ) : myProducts.length > 0 ? (
-              // ANIMASI: Grid produk dengan stagger effect
               <motion.div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4" variants={containerVariants}>
                 {myProducts.map((product) => (
-                  // ANIMASI: Kartu produk dengan animasi item
                   <motion.div key={product.id} variants={itemVariants} className="rounded-xl bg-white shadow-md p-4 flex flex-col">
                     <div className='relative w-full h-32 mb-3'>
                         <Image src={product.imageUrl} alt={product.name} layout="fill" objectFit="cover" className="rounded-md" />
@@ -248,7 +245,6 @@ function DashboardPage() {
         </motion.div>
       </div>
 
-      {/* ANIMASI: Modal Edit dengan animasi masuk & keluar */}
       <AnimatePresence>
         {isEditModalOpen && editingProduct && (
           <motion.div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -256,7 +252,6 @@ function DashboardPage() {
               <motion.button onClick={() => setIsEditModalOpen(false)} className="absolute top-3 right-3 text-gray-400 hover:text-gray-800 hover:bg-gray-100 rounded-full p-1.5 transition" whileTap={{scale: 0.8}}><CloseIcon size={20} /></motion.button>
               <h2 className="text-xl font-bold mb-5">Edit Produk</h2>
               <form onSubmit={handleUpdateSubmit} className="space-y-4">
-                {/* ... input dan textarea di dalam modal ... */}
                 <div>
                   <label htmlFor="editShopName" className="block text-sm font-medium text-gray-700">Nama Toko</label>
                   <input type="text" name="shopName" id="editShopName" value={editingProduct.shopName} onChange={handleEditFormChange} className="mt-1 w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:ring-2 focus:ring-blue-400" />
@@ -271,7 +266,7 @@ function DashboardPage() {
                 </div>
                 <div>
                   <label htmlFor="editDescription" className="block text-sm font-medium text-gray-700">Deskripsi</label>
-                  <textarea name="description" id="editDescription" value={editingProduct.description} onChange={handleEditFormChange as any} rows={4} className="mt-1 w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:ring-2 focus:ring-blue-400 resize-none"></textarea>
+                  <textarea name="description" id="editDescription" value={editingProduct.description} onChange={(e: ChangeEvent<HTMLTextAreaElement>) => handleEditFormChange(e)} rows={4} className="mt-1 w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:ring-2 focus:ring-blue-400 resize-none"></textarea>
                 </div>
                 <div className="flex justify-end space-x-3 pt-2">
                   <motion.button type="button" onClick={() => setIsEditModalOpen(false)} className="bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-md hover:bg-gray-200 transition-colors" whileHover={{scale: 1.05}} whileTap={{scale: 0.95}}>Batal</motion.button>

@@ -1,8 +1,8 @@
-// src/pages/api/reviews/index.ts
+// LOKASI FILE: src/pages/api/reviews/index.ts
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, query, where, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore'; // PERBAIKAN: Menghapus 'orderBy' yang tidak terpakai
 
 export default async function handler(
   req: NextApiRequest,
@@ -18,8 +18,6 @@ export default async function handler(
         return res.status(400).json({ message: 'productId diperlukan.' });
       }
 
-      // PERBAIKAN: Hapus orderBy untuk menghindari error 'missing index'.
-      // Pengurutan bisa dilakukan di front-end jika diperlukan.
       const q = query(
         reviewsCollection, 
         where("productId", "==", productId)
@@ -40,7 +38,6 @@ export default async function handler(
     }
   } 
   else if (req.method === 'POST') {
-    // ... (Logika POST tidak berubah) ...
     try {
       const { productId, userId, userName, rating, comment } = req.body;
       if (!productId || !userId || !userName || !rating || !comment) {
@@ -53,7 +50,6 @@ export default async function handler(
         createdAt: serverTimestamp(),
       };
       const docRef = await addDoc(reviewsCollection, newReview);
-      // Kirim kembali data yang baru dibuat agar bisa langsung ditampilkan
       res.status(201).json({ id: docRef.id, ...newReview, createdAt: { seconds: Date.now() / 1000, nanoseconds: 0 } });
 
     } catch (error) {

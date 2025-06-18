@@ -5,12 +5,12 @@ import Head from 'next/head';
 import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/context/AuthContext';
+// PERBAIKAN: Menghapus impor state yang tidak terpakai
+// import { useState, useEffect } from 'react';
+// import { useAuth } from '@/context/AuthContext';
 import ProductCard from '@/components/ui/ProductCard';
 import TestimonialCard from '@/components/ui/TestimonialCard'; 
 
-// --- TIDAK ADA PERUBAHAN PADA LOGIKA ATAU TIPE DATA ---
 interface Product {
   id: string; name: string; price: number; description: string; shopName: string; imageUrl: string; ownerId: string;
 }
@@ -22,21 +22,15 @@ const testimonials = [
   { text: 'Fitur info pelatihannya sangat bermanfaat. Saya jadi tahu program-program pemerintah untuk UMKM.', author: 'Budi Santoso', role: 'Pengrajin Batik Salem', avatarUrl: '/avatar/budi.jpg' },
   { text: 'Tampilan websitenya modern dan mudah digunakan. Produk saya jadi terlihat lebih profesional.', author: 'Rina Wulandari', role: 'Produsen Telur Asin', avatarUrl: '/avatar/rina.jpg' }
 ];
-// --- AKHIR DARI LOGIKA TIDAK DIUBAH ---
 
 const HomePage: NextPage<HomePageProps> = ({ products }) => {
-  // --- TIDAK ADA PERUBAHAN PADA LOGIKA ---
-  const { currentUser } = useAuth();
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
-  useEffect(() => {
-    setIsMounted(true);
-    const adminStatus = localStorage.getItem('isAdminLoggedIn');
-    if (adminStatus === 'true') { setIsAdmin(true); }
-  }, []);
-  // --- AKHIR DARI LOGIKA TIDAK DIUBAH ---
+  // PERBAIKAN: Menghapus state yang tidak terpakai
+  // const { currentUser } = useAuth();
+  // const [isAdmin, setIsAdmin] = useState(false);
+  // const [isMounted, setIsMounted] = useState(false);
+  // useEffect(() => { ... }, []);
+  // const renderCtaButton = () => { ... };
 
-  // PERBAIKAN: Menambahkan "as const" untuk mengatasi error TypeScript
   const sectionVariants = {
     hidden: { opacity: 0, y: 50 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: 'easeOut' } },
@@ -50,7 +44,6 @@ const HomePage: NextPage<HomePageProps> = ({ products }) => {
     hidden: { y: 20, opacity: 0 },
     visible: { y: 0, opacity: 1, transition: { type: 'spring', stiffness: 100 } },
   } as const;
-
 
   return (
     <div className="bg-[#0F172A]">
@@ -155,7 +148,6 @@ const HomePage: NextPage<HomePageProps> = ({ products }) => {
   );
 };
 
-// --- TIDAK ADA PERUBAHAN PADA LOGIKA getStaticProps ---
 export const getStaticProps: GetStaticProps = async () => {
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/produk`);
@@ -171,7 +163,11 @@ export const getStaticProps: GetStaticProps = async () => {
     };
   } catch (error) {
     console.error(error);
-    return { props: { products: [] } };
+    return {
+      props: {
+        products: [],
+      },
+    };
   }
 };
 

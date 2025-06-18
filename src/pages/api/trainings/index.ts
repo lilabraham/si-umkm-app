@@ -1,9 +1,9 @@
-// src/pages/api/trainings/index.ts
+// LOKASI FILE: src/pages/api/trainings/index.ts
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, getDocs, query, serverTimestamp } from 'firebase/firestore';
-import cookie from 'cookie'; // Impor library cookie
+import cookie from 'cookie';
 
 export interface Training {
   id: string;
@@ -12,7 +12,7 @@ export interface Training {
   schedule: string;
   location: string;
   organizer: string;
-  createdAt?: any;
+  createdAt?: { seconds: number; nanoseconds: number; }; // PERBAIKAN: Memberi tipe yang lebih spesifik
 }
 
 export default async function handler(
@@ -23,7 +23,6 @@ export default async function handler(
 
   switch (req.method) {
     case 'GET':
-      // Logika GET tidak perlu perlindungan CSRF karena hanya membaca data
       try {
         const q = query(trainingsCollection);
         const querySnapshot = await getDocs(q);
@@ -39,7 +38,6 @@ export default async function handler(
 
     case 'POST':
       try {
-        // ================== VALIDASI CSRF DIMULAI ==================
         const cookies = cookie.parse(req.headers.cookie || '');
         const csrfTokenFromCookie = cookies.csrf_token;
         const csrfTokenFromBody = req.body.csrfToken;
@@ -47,10 +45,9 @@ export default async function handler(
         if (!csrfTokenFromCookie || !csrfTokenFromBody || csrfTokenFromCookie !== csrfTokenFromBody) {
           return res.status(403).json({ message: 'Token CSRF tidak valid atau tidak ada.' });
         }
-        // ========================================================
         
-        // Hapus csrfToken dari data sebelum disimpan ke database
-        const { csrfToken, ...trainingData } = req.body;
+        // PERBAIKAN: Menghapus variabel 'csrfToken' yang tidak terpakai
+        const { csrfToken: _, ...trainingData } = req.body;
         const { title, description, schedule, location, organizer } = trainingData;
         
         if (!title || !description || !schedule || !location || !organizer) {

@@ -2,14 +2,12 @@
 
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/router';
-// TAMPILAN: Impor untuk ikon, animasi, dan komponen Link
 import { ShieldCheck, User, Lock, Loader2, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 
 
 const AdminLoginPage = () => {
-  // --- TIDAK ADA PERUBAHAN PADA LOGIKA STATE DAN FUNGSI ANDA ---
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -37,26 +35,26 @@ const AdminLoginPage = () => {
       localStorage.setItem('isAdminLoggedIn', 'true');
       router.push('/admin/dashboard');
 
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      // PERBAIKAN: Menggunakan 'unknown' dan melakukan pengecekan tipe
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Terjadi kesalahan yang tidak diketahui.');
+      }
     } finally {
       setLoading(false);  
     }
   };
-  // --- AKHIR DARI LOGIKA ANDA ---
 
   return (
-    // TAMPILAN: Latar belakang gelap gradien sesuai permintaan
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-tr from-slate-900 to-slate-800 text-white overflow-hidden">
-      
-      {/* TAMPILAN: Kartu login dengan animasi fade-in */}
       <motion.div
         className="w-full max-w-sm"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }} // Efek ease-out yang halus
+        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
       >
-        {/* TAMPILAN: Ikon shield dengan animasi */}
         <motion.div
           initial={{ scale: 0, rotate: -90 }}
           animate={{ scale: 1, rotate: 0 }}
@@ -66,16 +64,13 @@ const AdminLoginPage = () => {
           <ShieldCheck className="h-8 w-8 text-blue-400" />
         </motion.div>
 
-        {/* TAMPILAN: Card Glassmorphism transparan dengan backdrop blur */}
         <div className="rounded-2xl border border-slate-700 bg-slate-800/50 p-6 sm:p-8 shadow-2xl shadow-black/40 backdrop-blur-lg">
           <div className="text-center">
-            {/* TAMPILAN: Judul dengan font dan warna profesional */}
             <h1 className="text-2xl font-bold text-white">Admin Login</h1>
             <p className="text-sm text-slate-400 mt-1">Akses panel manajemen khusus.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-            {/* TAMPILAN: Field input modern dengan ikon */}
             <div>
               <label htmlFor="username" className="text-xs font-medium text-slate-400">Username</label>
               <div className="relative mt-1">
@@ -98,7 +93,6 @@ const AdminLoginPage = () => {
               </div>
             </div>
 
-            {/* TAMPILAN: Pesan error dengan animasi */}
             <AnimatePresence>
               {error && (
                 <motion.div 
@@ -114,7 +108,6 @@ const AdminLoginPage = () => {
             </AnimatePresence>
 
             <div className="pt-2">
-              {/* TAMPILAN: Tombol login dengan animasi interaktif */}
               <motion.button
                 type="submit"
                 className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-lg shadow-blue-600/20 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center justify-center"

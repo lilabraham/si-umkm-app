@@ -9,7 +9,6 @@ import { Star, MessageSquare, Send, UserCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 
-// --- TIDAK ADA PERUBAHAN PADA INTERFACE ---
 interface Product {
   id: string; name: string; price: number; description: string; shopName: string; imageUrl: string; ownerId: string;
 }
@@ -21,9 +20,6 @@ interface ProductDetailPageProps {
   initialReviews: Review[];
 }
 
-// --- KOMPONEN BANTU UNTUK TAMPILAN (TIDAK MENGUBAH LOGIKA) ---
-
-// Komponen untuk menampilkan bintang rating secara dinamis
 const StarRating = ({ rating, size = 16 }: { rating: number, size?: number }) => (
   <div className="flex items-center">
     {[...Array(5)].map((_, i) => (
@@ -32,10 +28,7 @@ const StarRating = ({ rating, size = 16 }: { rating: number, size?: number }) =>
   </div>
 );
 
-// --- AKHIR DARI KOMPONEN BANTU ---
-
 const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialReviews }) => {
-  // --- TIDAK ADA PERUBAHAN PADA LOGIKA STATE DAN FUNGSI ANDA ---
   const { currentUser } = useAuth();
   const [reviews, setReviews] = useState<Review[]>(initialReviews);
   const [rating, setRating] = useState(0);
@@ -74,15 +67,15 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialR
       setReviews(prev => [newReview, ...prev].sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)));
       setRating(0);
       setComment('');
-    } catch (error: any) {
-      setMessage(error.message || "Terjadi kesalahan.");
+    } catch (error) {
+      if (error instanceof Error) {
+        setMessage(error.message || "Terjadi kesalahan.");
+      }
     } finally {
       setLoading(false);
     }
   };
-  // --- AKHIR DARI LOGIKA ANDA ---
 
-  // Logika untuk kalkulasi rating rata-rata (hanya untuk tampilan)
   const { averageRating, totalReviews } = useMemo(() => {
     if (!reviews || reviews.length === 0) {
       return { averageRating: 0, totalReviews: 0 };
@@ -99,7 +92,6 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialR
   }
   
   return (
-    // TAMPILAN BARU: Latar belakang halaman dan animasi masuk
     <div className="bg-[#F8FAFC] min-h-screen">
       <Head>
         <title>{`${product.name} - Si-UMKM`}</title>
@@ -112,10 +104,8 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialR
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
       >
-        {/* TAMPILAN BARU: Layout utama 2 kolom */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-16 items-start">
           
-          {/* Kolom Kiri: Gambar Produk */}
           <motion.div 
             className="sticky top-24"
             whileHover={{ scale: 1.02 }}
@@ -133,7 +123,6 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialR
             </div>
           </motion.div>
 
-          {/* Kolom Kanan: Detail Produk */}
           <div className="w-full">
             <p className="text-sm font-semibold text-blue-600">{product.shopName}</p>
             <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mt-1">{product.name}</h1>
@@ -141,7 +130,6 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialR
               Rp {product.price.toLocaleString('id-ID')}
             </p>
 
-            {/* TAMPILAN BARU: Tombol Aksi */}
             <motion.button 
               className="w-full mt-6 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
               whileHover={{ scale: 1.02 }}
@@ -151,7 +139,6 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialR
               Hubungi Penjual
             </motion.button>
             
-            {/* TAMPILAN BARU: Deskripsi Produk */}
             <div className="border-t border-slate-200 pt-4 mt-6">
                 <h2 className="text-lg font-semibold text-slate-800">Deskripsi Produk</h2>
                 <p className="text-sm text-slate-600 leading-relaxed mt-2">{product.description}</p>
@@ -159,13 +146,11 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialR
           </div>
         </div>
         
-        {/* TAMPILAN BARU: Section Ulasan & Rating */}
         <div className="mt-12 lg:mt-16 border-t border-slate-200 pt-10">
           <h2 className="text-xl font-bold text-slate-800 mb-4 border-b border-slate-200 pb-2">
             Ulasan & Rating
           </h2>
           
-          {/* TAMPILAN BARU: Rating Summary */}
           {totalReviews > 0 && (
             <div className="flex items-center gap-3 mb-6 bg-white p-4 rounded-lg border shadow-sm">
                 <p className="text-4xl font-bold text-slate-800">{averageRating.toFixed(1)}</p>
@@ -176,7 +161,6 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialR
             </div>
           )}
 
-          {/* Form Ulasan */}
           {isMounted && currentUser && (
             <div className="bg-white p-6 rounded-xl mb-8 border shadow-sm">
               <h3 className="text-lg font-semibold mb-4 text-slate-800">Tulis Ulasan Anda</h3>
@@ -205,14 +189,12 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialR
             </div>
           )}
 
-          {/* TAMPILAN BARU: Login Notice */}
           {isMounted && !currentUser && (
             <div className="bg-slate-100 text-slate-600 text-sm px-4 py-3 rounded-lg border border-slate-200 text-center mb-8">
               <p><Link href="/login" className="text-blue-600 font-semibold hover:underline">Login</Link> untuk memberikan ulasan.</p>
             </div>
           )}
 
-          {/* TAMPILAN BARU: Daftar Komentar */}
           <div className="space-y-4">
             {reviews.length > 0 ? (
               reviews.map((review) => (
@@ -243,9 +225,7 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialR
   );
 };
 
-// --- TIDAK ADA PERUBAHAN PADA getStaticPaths & getStaticProps ---
 export const getStaticPaths: GetStaticPaths = async () => {
-    // ... Logika Anda tetap di sini ...
     try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/produk`);
         if (!res.ok) {
@@ -263,7 +243,6 @@ export const getStaticPaths: GetStaticPaths = async () => {
     }
 };
 export const getStaticProps: GetStaticProps = async (context) => {
-    // ... Logika Anda tetap di sini ...
     const { id } = context.params as { id: string };
     try {
       const productRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/produk/${id}`);

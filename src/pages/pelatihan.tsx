@@ -5,7 +5,7 @@ import Head from 'next/head';
 import TrainingCard from '@/components/ui/TrainingCard';
 import type { Training } from './api/trainings';
 import { Info } from 'lucide-react';
-import { motion, type Variants } from 'framer-motion'; // <-- pastikan 'Variants' juga diimpor
+import { motion } from 'framer-motion'; // PERBAIKAN: Menghapus 'type Variants' yang tidak terpakai
 
 interface PelatihanPageProps {
   trainings: Training[];
@@ -22,7 +22,6 @@ const PelatihanPage: NextPage<PelatihanPageProps> = ({ trainings }) => {
     },
   };
 
-  // PERBAIKAN: Menambahkan "as const" di akhir objek untuk mengatasi error TypeScript
   const cardVariants = {
     hidden: { y: 20, opacity: 0 },
     visible: {
@@ -86,9 +85,7 @@ const PelatihanPage: NextPage<PelatihanPageProps> = ({ trainings }) => {
   );
 };
 
-// --- TIDAK ADA PERUBAHAN PADA LOGIKA getStaticProps ---
-export const getStaticProps: GetStaticProps = async (context) => {
-  // ... Logika Anda tetap di sini ...
+export const getStaticProps: GetStaticProps = async () => { // PERBAIKAN: Menghapus 'context' yang tidak terpakai
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/trainings`);
     if (!res.ok) {
