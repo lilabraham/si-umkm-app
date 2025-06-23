@@ -1,11 +1,11 @@
 // LOKASI FILE: src/pages/api/trainings/index.ts
-// KODE YANG SUDAH DIPERBAIKI DENGAN VERIFIKASI ADMIN
+// KODE YANG SUDAH DIPERBAIKI (FINAL)
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, getDocs, query, serverTimestamp } from 'firebase/firestore';
-import * as cookie from 'cookie'; // Memastikan import cookie sudah benar
-import jwt from 'jsonwebtoken';   // <-- Tambahkan import untuk JWT
+import * as cookie from 'cookie';
+import jwt from 'jsonwebtoken';
 
 export interface Training {
   id: string;
@@ -25,7 +25,6 @@ export default async function handler(
 
   switch (req.method) {
     case 'GET':
-      // Logika GET tetap sama, tidak perlu diubah
       try {
         const q = query(trainingsCollection);
         const querySnapshot = await getDocs(q);
@@ -41,17 +40,13 @@ export default async function handler(
 
     case 'POST':
       try {
-        // --- PERBAIKAN DIMULAI DI SINI ---
-
-        // 1. Verifikasi Token Otentikasi Admin
         const cookies = cookie.parse(req.headers.cookie || '');
-        const authToken = cookies.auth_token; // Ambil token dari cookie login admin
+        const authToken = cookies.auth_token;
 
         if (!authToken) {
           return res.status(401).json({ message: 'Tidak terotentikasi. Silakan login sebagai admin.' });
         }
 
-        // Verifikasi JWT
         const jwtSecret = process.env.JWT_SECRET;
         if (!jwtSecret) {
           throw new Error('JWT_SECRET tidak diatur di environment variables.');
@@ -59,12 +54,11 @@ export default async function handler(
         
         // Blok try...catch khusus untuk verifikasi JWT
         try {
-          jwt.verify(authToken, jwtSecret); // Jika token tidak valid, ini akan melempar error
-        } catch (jwtError) {
+          jwt.verify(authToken, jwtSecret);
+        } catch { // <-- PERBAIKAN: Menghapus (jwtError) dari sini
           return res.status(401).json({ message: 'Token tidak valid atau sudah kedaluwarsa.' });
         }
         
-        // 2. Verifikasi Token CSRF (Logika Anda yang sudah ada)
         const csrfTokenFromCookie = cookies.csrf_token;
         const csrfTokenFromBody = req.body.csrfToken;
 
@@ -72,9 +66,6 @@ export default async function handler(
           return res.status(403).json({ message: 'Token CSRF tidak valid atau tidak ada.' });
         }
         
-        // --- AKHIR DARI PERBAIKAN ---
-
-        // Logika selanjutnya tetap sama
         const trainingData = { ...req.body };
         delete trainingData.csrfToken;
         
@@ -88,7 +79,6 @@ export default async function handler(
         res.status(201).json({ id: docRef.id, ...newTraining });
 
       } catch (error) {
-        // Menambahkan log error di server untuk memudahkan debugging di Vercel
         console.error("Error saat menyimpan pelatihan:", error); 
         res.status(500).json({ message: 'Gagal menyimpan data pelatihan', error: (error as Error).message });
       }
