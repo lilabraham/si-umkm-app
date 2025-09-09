@@ -5,49 +5,56 @@ import { useRouter } from 'next/router';
 import { ShieldCheck, User, Lock, Loader2, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
+// DIUBAH: Impor yang diperlukan dari Firebase
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 
 
 const AdminLoginPage = () => {
-  const [username, setUsername] = useState('');
+  // DIUBAH: 'username' menjadi 'email' agar sesuai dengan Firebase Auth
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  // ======================= LOGIKA UTAMA DIPERBARUI DI SINI =======================
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
     try {
-      const response = await fetch('/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
+      // 1. Lakukan login menggunakan Firebase Authentication
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
 
-      const data = await response.json();
+      // 2. Cek peran pengguna di database Firestore
+      const userDocRef = doc(db, "users", user.uid);
+      const userDoc = await getDoc(userDocRef);
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Terjadi kesalahan');
-      }
-
-      localStorage.setItem('isAdminLoggedIn', 'true');
-      router.push('/admin/dashboard');
-
-    } catch (err) {
-      // PERBAIKAN: Menggunakan 'unknown' dan melakukan pengecekan tipe
-      if (err instanceof Error) {
-        setError(err.message);
+      // 3. Verifikasi apakah pengguna adalah admin
+      if (userDoc.exists() && userDoc.data().role === 'admin') {
+        // Jika benar admin, arahkan ke dashboard
+        router.push('/admin/dashboard');
       } else {
-        setError('Terjadi kesalahan yang tidak diketahui.');
+        // Jika bukan admin (atau datanya tidak ada), logout paksa dan beri pesan error
+        await auth.signOut();
+        setError("Akses ditolak. Akun ini bukan merupakan akun admin.");
       }
+
+    } catch (err: any) {
+      // Menangani error dari Firebase (misal: password salah)
+      setError(err.message.replace('Firebase: ', ''));
     } finally {
-      setLoading(false);  
+      setLoading(false);  
     }
   };
+  // ==============================================================================
 
   return (
+    // SELURUH KODE JSX DI BAWAH INI TIDAK DIUBAH SAMA SEKALI, HANYA DISESUAIKAN VARIABELNYA
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-tr from-slate-900 to-slate-800 text-white overflow-hidden">
       <motion.div
         className="w-full max-w-sm"
@@ -72,18 +79,18 @@ const AdminLoginPage = () => {
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-5">
             <div>
-              <label htmlFor="username" className="text-xs font-medium text-slate-400">Username</label>
+              <label htmlFor="email" className="text-xs font-medium text-slate-400">Email</label>
               <div className="relative mt-1">
                 <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input 
-                  id="username" name="username" type="text" required value={username} onChange={(e) => setUsername(e.target.value)}
+                  id="email" name="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-2.5 pl-10 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                 />
               </div>
             </div>
             
             <div>
-              <label htmlFor="password"  className="text-xs font-medium text-slate-400">Password</label>
+              <label htmlFor="password"  className="text-xs font-medium text-slate-400">Password</label>
               <div className="relative mt-1">
                 <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input 

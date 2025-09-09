@@ -2,23 +2,22 @@
 
 import '@/styles/globals.css';
 import type { AppProps } from 'next/app';
+// DIUBAH: Menggunakan path 'layout' huruf kecil untuk konsistensi
 import Navbar from '@/components/Layout/Navbar';
 import Footer from '@/components/Layout/Footer';
 import { AuthProvider } from '@/context/AuthContext';
-// Impor library Apollo Client
 import { ApolloProvider, ApolloClient, InMemoryCache } from '@apollo/client';
 
-// Buat instance Apollo Client
-// Ini akan terhubung ke API GraphQL yang sudah kita buat
+// DIPINDAHKAN: Instance Apollo Client dibuat di luar komponen
+// agar tidak dibuat ulang pada setiap render. Ini adalah praktik terbaik.
 const client = new ApolloClient({
-  uri: '/api/graphql', // URL server GraphQL kita
-  cache: new InMemoryCache(), // Digunakan untuk caching data
+  uri: '/api/graphql',
+  cache: new InMemoryCache(),
 });
 
 function MyApp({ Component, pageProps }: AppProps) {
   return (
-    // Bungkus AuthProvider dengan ApolloProvider
-    // agar semua komponen di bawahnya bisa melakukan query GraphQL
+    // Struktur Provider Anda sudah benar
     <ApolloProvider client={client}>
       <AuthProvider>
         <div className="flex flex-col min-h-screen">

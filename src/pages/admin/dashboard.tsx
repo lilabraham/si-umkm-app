@@ -1,24 +1,23 @@
 // LOKASI FILE: src/pages/admin/dashboard.tsx
 
 import type { GetServerSideProps, NextPage } from 'next';
-// PERBAIKAN: Menghapus 'useRouter' yang tidak terpakai
 import { useState, FormEvent, ChangeEvent } from 'react';
-import { Plus, Edit, Trash2, X as CloseIcon, LogOut } from 'lucide-react';
+import { Plus, Edit, Trash2, X as CloseIcon } from 'lucide-react';
 import type { Training } from '../api/trainings';
 import { motion, AnimatePresence } from 'framer-motion';
+import AdminLayout from '@/components/Layout/AdminLayout';
+import nookies from 'nookies';
+import { admin } from '@/lib/firebaseAdmin';
 
 interface AdminDashboardPageProps {
   initialTrainings: Training[];
 }
 
 const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({ initialTrainings }) => {
-  // PERBAIKAN: Menghapus 'router' yang tidak terpakai
-  // const router = useRouter(); 
   const [trainings, setTrainings] = useState<Training[]>(initialTrainings);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [currentTraining, setCurrentTraining] = useState<Partial<Training>>({});
-  const [csrfToken, setCsrfToken] = useState('');
   const [formError, setFormError] = useState('');
   
   const fetchTrainings = async () => {
@@ -31,30 +30,11 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({ initialTraining
     }
   };
 
-  const handleLogout = async () => {
-    localStorage.removeItem('isAdminLoggedIn');
-    await fetch('/api/admin/logout', { method: 'POST' });
-    window.location.href = '/admin/login';
-  };
-
-  const openModal = async (mode: 'add' | 'edit', training?: Training) => {
+  const openModal = (mode: 'add' | 'edit', training?: Training) => {
     setFormError('');
-    try {
-      const res = await fetch('/api/admin/csrf-token');
-      if (!res.ok) throw new Error('Gagal mendapatkan token keamanan');
-      const data = await res.json();
-      setCsrfToken(data.csrfToken);
-      setModalMode(mode);
-      setCurrentTraining(mode === 'add' ? {} : training || {});
-      setIsModalOpen(true);
-    } catch (error) {
-      // PERBAIKAN: Menggunakan tipe 'unknown' dan melakukan pengecekan
-      if (error instanceof Error) {
-        alert(error.message || "Gagal memuat form. Silakan coba lagi.");
-      } else {
-        alert("Gagal memuat form. Silakan coba lagi.");
-      }
-    }
+    setModalMode(mode);
+    setCurrentTraining(mode === 'add' ? {} : training || {});
+    setIsModalOpen(true);
   };
   
   const handleFormChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -66,13 +46,12 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({ initialTraining
     setFormError('');
     const url = modalMode === 'add' ? '/api/trainings' : `/api/trainings/${currentTraining.id}`;
     const method = modalMode === 'add' ? 'POST' : 'PUT';
-    const body = JSON.stringify({ ...currentTraining, csrfToken });
-
+    
     try {
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body,
+        body: JSON.stringify(currentTraining),
       });
       if (!response.ok) {
         const errorData = await response.json();
@@ -81,7 +60,6 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({ initialTraining
       setIsModalOpen(false);
       fetchTrainings();
     } catch (error) {
-      // PERBAIKAN: Menggunakan tipe 'unknown' dan melakukan pengecekan
       if (error instanceof Error) {
         setFormError(error.message);
       }
@@ -100,8 +78,8 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({ initialTraining
   };
 
   const containerVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { staggerChildren: 0.1 } },
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
   };
 
   const itemVariants = {
@@ -110,37 +88,23 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({ initialTraining
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-white shadow-sm sticky top-0 z-40">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-3">
-                <h1 className="text-lg font-semibold text-slate-900">Admin Dashboard</h1>
-                <motion.button 
-                    onClick={handleLogout} 
-                    className="flex items-center gap-2 text-sm text-red-600 font-medium hover:text-red-800 transition-colors"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                >
-                    <LogOut size={16} />
-                    Logout
-                </motion.button>
-            </div>
-        </div>
-      </header>
-
-      <motion.main 
-        className="container mx-auto px-4 sm:px-6 lg:px-8 py-8"
-        initial="hidden"
-        animate="visible"
-        variants={containerVariants}
-      >
-        <motion.div variants={itemVariants} className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">Manajemen Pelatihan</h2>
+    <AdminLayout>
+      <div className="p-6 lg:p-10">
+        <motion.div 
+          className="flex justify-between items-center mb-6"
+          initial="hidden"
+          animate="visible"
+          variants={containerVariants}
+        >
+          <motion.h2 variants={itemVariants} className="text-2xl font-bold text-gray-800">
+            Manajemen Pelatihan
+          </motion.h2>
           <motion.button 
             onClick={() => openModal('add')} 
             className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-md shadow-md hover:bg-blue-700 transition-all duration-300"
             whileHover={{ scale: 1.05, y: -2 }}
             whileTap={{ scale: 0.95 }}
+            variants={itemVariants}
           >
             <Plus size={20} className="mr-2" /> 
             Tambah Pelatihan
@@ -190,7 +154,7 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({ initialTraining
             </tbody>
           </table>
         </motion.div>
-      </motion.main>
+      </div> {/* <-- DI PERBAIKI: Tag penutup yang benar sekarang adalah </div> */}
       
       <AnimatePresence>
         {isModalOpen && (
@@ -216,12 +180,7 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({ initialTraining
                   <input type="text" name="location" placeholder="Lokasi (Contoh: Online via Zoom)" value={currentTraining.location || ''} onChange={handleFormChange} className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:ring-2 focus:ring-blue-400" required/>
                   <input type="text" name="organizer" placeholder="Penyelenggara" value={currentTraining.organizer || ''} onChange={handleFormChange} className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:ring-2 focus:ring-blue-400" required/>
                   <div className="flex justify-end pt-2">
-                    <motion.button 
-                      type="submit" 
-                      className="bg-blue-600 text-white font-semibold py-2 px-5 rounded-md"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                    >Simpan</motion.button>
+                    <motion.button type="submit" className="bg-blue-600 text-white font-semibold py-2 px-5 rounded-md" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>Simpan</motion.button>
                   </div>
                   {formError && (<p className="text-red-600 text-sm text-center mt-2">{formError}</p>)}
               </form>
@@ -229,30 +188,34 @@ const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({ initialTraining
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </AdminLayout>
   );
 };
 
-export const getServerSideProps: GetServerSideProps = async () => { // PERBAIKAN: Menghapus 'context' yang tidak terpakai
+export const getServerSideProps: GetServerSideProps = async (context) => {
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/trainings`);
-    if (!res.ok) {
-      return { props: { initialTrainings: [] } };
+    const cookies = nookies.get(context);
+    const token = await admin.auth().verifyIdToken(cookies.token || '');
+
+    const userDoc = await admin.firestore().collection('users').doc(token.uid).get();
+    if (userDoc.data()?.role !== 'admin') {
+      return { redirect: { destination: '/', permanent: false } };
     }
-    const trainings: Training[] = await res.json();
+    
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+    const res = await fetch(`${apiUrl}/api/trainings`);
+    let trainings: Training[] = [];
+    if (res.ok) {
+        trainings = await res.json();
+    }
+    
     const sortedTrainings = trainings.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    
     return {
-      props: {
-        initialTrainings: sortedTrainings,
-      },
+      props: { initialTrainings: JSON.parse(JSON.stringify(sortedTrainings)) },
     };
   } catch (error) {
-    console.error("Error di getServerSideProps (admin/dashboard):", error);
-    return {
-      props: {
-        initialTrainings: [],
-      },
-    };
+    return { redirect: { destination: '/login', permanent: false } };
   }
 };
 

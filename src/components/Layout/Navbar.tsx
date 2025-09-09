@@ -1,29 +1,18 @@
-// LOKASI FILE: src/components/Layout/Navbar.tsx
-// KODE YANG SUDAH DIPERBAIKI SESUAI REQUIREMENT
+// LOKASI FILE: src/components/layout/Navbar.tsx
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/context/AuthContext';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
-import { Menu, X, Store, LogIn, LogOut, User, ShieldCheck } from 'lucide-react';
+import { Menu, X, Store, LogIn, LogOut, User, ShieldCheck, ShoppingBag } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
-  const { currentUser } = useAuth();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { currentUser, loading } = useAuth();
   const router = useRouter();
-
-  useEffect(() => {
-    setIsMounted(true);
-    const adminStatus = localStorage.getItem('isAdminLoggedIn');
-    if (adminStatus === 'true') {
-      setIsAdmin(true);
-    }
-  }, []);
 
   const navLinks = [
     { name: 'Home', href: '/' },
@@ -53,7 +42,6 @@ const Navbar = () => {
     visible: { x: 0, opacity: 1 },
   };
   
-  // Komponen NavLink untuk Desktop
   const NavLink = ({ href, children }: { href: string; children: React.ReactNode }) => {
     const isActive = router.pathname === href;
     return (
@@ -71,12 +59,10 @@ const Navbar = () => {
     );
   };
   
-  // Komponen NavLink untuk Admin di Desktop
   const AdminNavLink = ({ href, children }: { href: string; children: React.ReactNode }) => {
     const isActive = router.pathname.startsWith(href);
     return (
       <Link href={href}>
-        {/* REQ-2: Menggunakan warna yang lebih kontras untuk Admin Panel di Desktop */}
         <span className={`relative text-sm font-semibold transition-colors border-2 rounded-full px-3 py-1 ${isActive ? 'border-yellow-500 text-yellow-600 bg-yellow-100/80' : 'border-transparent text-slate-600 hover:text-yellow-600'}`}>
           {children}
         </span>
@@ -84,7 +70,6 @@ const Navbar = () => {
     );
   };
 
-  // REQ-4: Komponen NavLink khusus untuk Mobile dengan Indikator Aktif
   const MobileNavLink = ({ href, children, onClick }: { href: string, children: React.ReactNode, onClick: () => void }) => {
     const isActive = router.pathname === href;
     const activeClasses = 'text-blue-600 font-semibold border-l-4 border-blue-600 pl-4';
@@ -106,32 +91,39 @@ const Navbar = () => {
             <span className="text-xl font-bold text-slate-800">Si-UMKM</span>
           </Link>
           
-          {/* Navigasi Desktop */}
-          <motion.div className="hidden md:flex items-center gap-6">
+          <div className="hidden md:flex items-center gap-6">
             {navLinks.map((link) => <NavLink key={link.name} href={link.href}>{link.name}</NavLink>)}
-            {isMounted && currentUser && <NavLink href="/dashboard">Dashboard</NavLink>}
-            {isMounted && isAdmin && <AdminNavLink href="/admin/dashboard">Admin Panel</AdminNavLink>}
-          </motion.div>
-
-          <div className="hidden md:flex items-center gap-3">
-            {isMounted && (
-              <>
-                {currentUser ? (
-                  <motion.button onClick={handleUserLogout} className="flex items-center gap-2 text-sm font-medium bg-red-500 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-red-600 transition-all" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <LogOut size={16} /> Logout
-                  </motion.button>
-                ) : !isAdmin && (
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Link href="/login" className="flex items-center gap-2 text-sm font-medium bg-blue-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-blue-700 transition-all">
-                      <LogIn size={16} /> Login
-                    </Link>
-                  </motion.div>
-                )}
-              </>
+            {currentUser && currentUser.role === 'penjual' && (
+               <NavLink href="/dashboard">Dashboard</NavLink>
+            )}
+            {currentUser && currentUser.role === 'admin' && (
+              <AdminNavLink href="/admin/dashboard">Admin Panel</AdminNavLink>
             )}
           </div>
 
-          {/* REQ-3: Tombol Hamburger Menu dengan Aksesibilitas dan Efek Hover */}
+          <div className="hidden md:flex items-center gap-3">
+            {loading ? (
+              <div className="h-9 w-32 bg-gray-200 rounded-lg animate-pulse"></div>
+            ) : currentUser ? (
+              <motion.button onClick={handleUserLogout} className="flex items-center gap-2 text-sm font-medium bg-red-500 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-red-600 transition-all" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <LogOut size={16} /> Logout
+              </motion.button>
+            ) : (
+              <div className="flex items-center gap-3">
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Link href="/daftar-penjual" className="flex items-center gap-2 text-sm font-medium bg-white text-blue-600 border border-blue-600 px-4 py-2 rounded-lg shadow-sm hover:bg-blue-50 transition-all">
+                    Mulai Berjualan
+                  </Link>
+                </motion.div>
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Link href="/login" className="flex items-center gap-2 text-sm font-medium bg-blue-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-blue-700 transition-all">
+                    <LogIn size={16} /> Login
+                  </Link>
+                </motion.div>
+              </div>
+            )}
+          </div>
+
           <div className="md:hidden">
             <motion.button 
               onClick={() => setIsOpen(!isOpen)} 
@@ -145,7 +137,6 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* Kontainer Menu Mobile (Sidebar) */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -153,16 +144,15 @@ const Navbar = () => {
             initial="hidden"
             animate="visible"
             exit="exit"
-            className="md:hidden fixed inset-0 bg-white z-40 pt-16" // pt-16 sama dengan tinggi navbar (h-16)
+            className="md:hidden fixed inset-0 bg-white z-40 pt-16"
           >
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col h-full">
               <motion.div 
-                className="flex flex-col gap-2" // Mengurangi gap agar lebih rapat
+                className="flex flex-col gap-2"
                 initial="hidden"
                 animate="visible"
                 transition={{ staggerChildren: 0.07 }}
               >
-                {/* REQ-4: Menggunakan komponen MobileNavLink yang baru */}
                 {navLinks.map((link) => (
                   <motion.div key={link.name} variants={mobileLinkVariants}>
                     <MobileNavLink href={link.href} onClick={() => setIsOpen(false)}>
@@ -173,34 +163,27 @@ const Navbar = () => {
                 
                 <hr className="border-slate-200 my-4" />
                 
-                {isMounted && (
+                {!loading && (
                   <>
-                    {currentUser && (
-                       <motion.div variants={mobileLinkVariants}>
-                         <MobileNavLink href="/dashboard" onClick={() => setIsOpen(false)}>
-                           <div className="flex items-center gap-3">
-                             <User size={20} /> Dashboard
-                           </div>
-                         </MobileNavLink>
-                       </motion.div>
-                    )}
-                    {isAdmin && (
-                      <motion.div variants={mobileLinkVariants}>
-                        {/* REQ-2: Menggunakan warna yang lebih kontras dan ikon */}
-                        <Link href="/admin/dashboard" className="flex items-center gap-3 text-lg font-bold text-yellow-600 pl-5 py-2" onClick={() => setIsOpen(false)}>
-                          <ShieldCheck size={20} /> Admin Panel
-                        </Link>
-                      </motion.div>
-                    )}
-
                     {currentUser ? (
-                      <motion.button onClick={handleUserLogout} className="flex items-center gap-3 text-lg font-bold text-red-600 mt-auto pl-5 py-2">
-                        <LogOut size={20} /> Logout
-                      </motion.button>
-                    ) : !isAdmin && (
-                      <motion.div variants={mobileLinkVariants} className="mt-6">
+                      <>
+                        {currentUser.role === 'penjual' && (
+                            <motion.div variants={mobileLinkVariants}><MobileNavLink href="/dashboard" onClick={() => setIsOpen(false)}><div className="flex items-center gap-3"><User size={20} /> Dashboard</div></MobileNavLink></motion.div>
+                        )}
+                        {currentUser.role === 'admin' && (
+                           <motion.div variants={mobileLinkVariants}><Link href="/admin/dashboard" className="flex items-center gap-3 text-lg font-bold text-yellow-600 pl-5 py-2" onClick={() => setIsOpen(false)}><ShieldCheck size={20} /> Admin Panel</Link></motion.div>
+                        )}
+                        <motion.button onClick={handleUserLogout} className="flex items-center gap-3 text-lg font-bold text-red-600 mt-auto pl-5 py-2">
+                          <LogOut size={20} /> Logout
+                        </motion.button>
+                      </>
+                    ) : (
+                      <motion.div variants={mobileLinkVariants} className="mt-6 flex flex-col gap-4">
+                        <Link href="/daftar-penjual" onClick={() => setIsOpen(false)} className="flex items-center justify-center gap-3 w-full bg-white text-blue-600 border border-blue-600 font-semibold py-3 rounded-lg shadow-sm hover:bg-blue-50 transition-colors">
+                            <ShoppingBag size={20}/> Mulai Berjualan
+                        </Link>
                         <Link href="/login" onClick={() => setIsOpen(false)} className="flex items-center justify-center gap-3 w-full bg-blue-600 text-white font-semibold py-3 rounded-lg shadow-sm hover:bg-blue-700 transition-colors">
-                          <LogIn size={20}/> Login
+                            <LogIn size={20}/> Login
                         </Link>
                       </motion.div>
                     )}
@@ -214,5 +197,4 @@ const Navbar = () => {
     </nav>
   );
 };
-
 export default Navbar;

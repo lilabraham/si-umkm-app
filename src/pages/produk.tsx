@@ -1,37 +1,37 @@
 // LOKASI FILE: src/pages/produk.tsx
-// KODE YANG SUDAH DIPERBAIKI
+// KODE YANG SUDAH DIPERBARUI SECARA LENGKAP
 
 import type { GetStaticProps, NextPage } from 'next';
 import { useState, useMemo } from 'react';
-import ProductCard from '@/components/ui/ProductCard';
-import { Search, Frown } from 'lucide-react';
+import TokoCard from '@/components/ui/TokoCard'; // DIUBAH: Menggunakan TokoCard
+import { Search, Frown, Store } from 'lucide-react'; // DIUBAH: Menambah ikon Store
 import { motion } from 'framer-motion';
 
-interface Product {
+// DIUBAH: Interface data sekarang untuk Toko
+interface Toko {
   id: string;
   name: string;
-  price: number;
-  shopName: string;
   imageUrl: string;
-  rating?: number;
-}
-interface ProdukPageProps {
-  initialProducts: Product[];
 }
 
-const ProdukPage: NextPage<ProdukPageProps> = ({ initialProducts }) => {
+interface TokoPageProps {
+  initialToko: Toko[];
+}
+
+const ProdukPage: NextPage<TokoPageProps> = ({ initialToko = [] }) => {
   const [searchTerm, setSearchTerm] = useState('');
   
-  const productsToDisplay = useMemo(() => {
+  // DIUBAH: Logika filter disesuaikan untuk mencari nama toko
+  const tokoToDisplay = useMemo(() => {
     if (!searchTerm) {
-      return initialProducts;
+      return initialToko;
     }
-    return initialProducts.filter(product => 
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.shopName.toLowerCase().includes(searchTerm.toLowerCase())
+    return initialToko.filter(toko => 
+      toko.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [searchTerm, initialProducts]);
+  }, [searchTerm, initialToko]);
 
+  // Varian animasi (tidak berubah)
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: { opacity: 1, transition: { staggerChildren: 0.07 } },
@@ -42,14 +42,16 @@ const ProdukPage: NextPage<ProdukPageProps> = ({ initialProducts }) => {
   } as const;
 
   return (
+    // Styling inti dari container utama (bg-slate-50) tidak diubah
     <div className="bg-slate-50 min-h-screen">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center mb-10">
+          {/* DIUBAH: Teks disesuaikan untuk konteks toko/UMKM */}
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">
-            Jelajahi Produk UMKM Lokal
+            Jelajahi UMKM Lokal
           </h1>
           <p className="mt-3 max-w-2xl mx-auto text-lg text-slate-500">
-            Temukan produk unggulan dari para pelaku UMKM di sekitar Anda.
+            Temukan dan dukung para pelaku UMKM berbakat di sekitar Anda.
           </p>
         </div>
 
@@ -62,34 +64,36 @@ const ProdukPage: NextPage<ProdukPageProps> = ({ initialProducts }) => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Cari produk UMKM atau nama toko..."
+              // DIUBAH: Placeholder disesuaikan
+              placeholder="Cari nama toko UMKM..."
               className="w-full py-3 pl-12 pr-4 text-gray-900 bg-white border border-gray-300 rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
             />
           </div>
         </form>
         
-        {productsToDisplay.length > 0 ? (
+        {tokoToDisplay.length > 0 ? (
           <motion.div 
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8" // DIUBAH: Gap sedikit diperbesar
             variants={containerVariants}
             initial="hidden"
             animate="visible"
           >
-            {productsToDisplay.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
+            {/* DIUBAH: Melakukan map dan render TokoCard */}
+            {tokoToDisplay.map((toko) => (
+              <TokoCard
+                key={toko.id}
+                toko={toko}
                 variants={cardVariants}
               />
             ))}
           </motion.div>
         ) : (
           <div className="text-center py-16 px-6 bg-white rounded-lg shadow-sm">
-             <Frown className="mx-auto text-gray-400" size={48} />
-             <h3 className="mt-4 text-xl font-semibold text-gray-800">Oops! Produk tidak ditemukan</h3>
-             {/* PERBAIKAN: Menggunakan kutipan yang aman untuk JSX */}
+             {/* DIUBAH: Teks dan ikon disesuaikan untuk konteks toko */}
+             <Store className="mx-auto text-gray-400" size={48} />
+             <h3 className="mt-4 text-xl font-semibold text-gray-800">Oops! Toko tidak ditemukan</h3>
              <p className="mt-2 text-gray-500">
-                Kami tidak dapat menemukan produk untuk kata kunci “<span className="font-semibold text-gray-700">{searchTerm}</span>”.
+               Kami tidak dapat menemukan UMKM untuk kata kunci “<span className="font-semibold text-gray-700">{searchTerm}</span>”.
              </p>
            </div>
         )}
@@ -100,24 +104,24 @@ const ProdukPage: NextPage<ProdukPageProps> = ({ initialProducts }) => {
 
 export const getStaticProps: GetStaticProps = async () => {
   try {
-    // Pastikan NEXT_PUBLIC_API_URL sudah benar di environment variables Vercel Anda
+    // DIUBAH: Idealnya, Anda membuat API endpoint baru untuk mengambil daftar toko
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-    const res = await fetch(`${apiUrl}/api/produk`);
+    const res = await fetch(`${apiUrl}/api/toko`); // Misal: /api/toko
+    
     if (!res.ok) {
-      // Jika respons tidak ok (cth: 404, 500), lempar error untuk masuk ke blok catch
-      throw new Error(`Failed to fetch products: ${res.statusText}`);
+      throw new Error(`Failed to fetch toko: ${res.statusText}`);
     }
-    const products: Product[] = await res.json();
+    const toko: Toko[] = await res.json();
 
     return { 
       props: { 
-        initialProducts: products 
+        initialToko: toko
       }, 
       revalidate: 60 
     };
-  } catch { // PERBAIKAN: Menghapus variabel 'error' yang tidak digunakan
-    console.warn("Gagal mengambil data produk saat build, halaman akan menampilkan data kosong.");
-    return { props: { initialProducts: [] } };
+  } catch (error) { // Menangkap error spesifik untuk logging
+    console.error("Gagal mengambil data toko saat build:", error);
+    return { props: { initialToko: [] } };
   }
 };
 
