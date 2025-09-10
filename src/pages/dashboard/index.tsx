@@ -1,7 +1,7 @@
 // LOKASI FILE: src/pages/dashboard/index.tsx
 
 import { useState, useEffect, FormEvent, ChangeEvent, useRef } from 'react';
-import type { GetServerSideProps, NextPage } from 'next';
+import type { NextPage } from 'next';
 import Head from 'next/head';
 import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
@@ -9,10 +9,8 @@ import { collection, addDoc, serverTimestamp, query, where, getDocs, deleteDoc, 
 import { db } from '@/lib/firebase';
 import { UploadCloud, Edit, Trash2, X as CloseIcon, Image as ImageIcon, Loader2, Plus, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import nookies from 'nookies';
-import { admin } from '@/lib/firebaseAdmin';
+import withAuth from '@/components/common/withAuth';
 
-// Tipe data Product
 interface Product {
   id: string; 
   name: string; 
@@ -24,7 +22,7 @@ interface Product {
 }
 
 const SellerDashboardPage: NextPage = () => {
-  const { currentUser, loading: authLoading } = useAuth();
+  const { currentUser } = useAuth();
   
   const [myProducts, setMyProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,27 +35,27 @@ const SellerDashboardPage: NextPage = () => {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // FUNGSI YANG HILANG, SEKARANG SUDAH DITAMBAHKAN KEMBALI
   const fetchMyProducts = async () => {
     if (!currentUser) return;
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/produk?tokoId=${currentUser.uid}`);
-      if (!response.ok) throw new Error('Gagal mengambil data produk');
-      const userProducts: Product[] = await response.json();
-      setMyProducts(userProducts);
+      const productsRef = collection(db, 'products');
+      const q = query(productsRef, where("ownerId", "==", currentUser.uid));
+      const querySnapshot = await getDocs(q);
+      setMyProducts(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[]);
     } catch (error) {
       console.error("Gagal mengambil produk:", error);
+      setError("Gagal memuat produk Anda.");
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    if (currentUser) {
-      fetchMyProducts();
-    }
+    fetchMyProducts();
   }, [currentUser]);
-
+  
   const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -96,7 +94,6 @@ const SellerDashboardPage: NextPage = () => {
     if (!currentUser) return;
     setIsSubmitting(true);
     setError(null);
-    
     try {
         let imageUrl = currentProduct.imageUrl || '';
         if (productImageFile) {
@@ -110,7 +107,6 @@ const SellerDashboardPage: NextPage = () => {
             if (!uploadRes.ok) throw new Error(uploadData.error || 'Gagal upload gambar.');
             imageUrl = uploadData.secure_url;
         }
-
         if (!imageUrl) throw new Error("Gambar produk wajib diisi.");
         
         const { id, ...productData } = currentProduct;
@@ -123,14 +119,12 @@ const SellerDashboardPage: NextPage = () => {
             shopName: currentUser.displayName || currentUser.email,
             ownerId: currentUser.uid,
         };
-
         if (modalMode === 'add') {
             await addDoc(collection(db, "products"), { ...dataToSave, createdAt: serverTimestamp() });
         } else {
             if(!id) throw new Error("ID Produk tidak ditemukan untuk diedit.");
             await updateDoc(doc(db, "products", id), dataToSave);
         }
-
         setIsModalOpen(false);
         fetchMyProducts();
     } catch (err: any) {
@@ -149,14 +143,6 @@ const SellerDashboardPage: NextPage = () => {
         setError("Gagal menghapus produk.");
     }
   };
-
-  if (authLoading) {
-    return (
-        <div className="flex justify-center items-center min-h-screen bg-slate-50">
-            <Loader2 className="animate-spin text-blue-600" size={40}/>
-        </div>
-    );
-  }
 
   return (
     <div className="bg-slate-50 min-h-screen">
@@ -209,7 +195,7 @@ const SellerDashboardPage: NextPage = () => {
         
         <AnimatePresence>
             {isModalOpen && (
-              <motion.div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <motion.div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <motion.div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg relative" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}>
                   <button onClick={() => setIsModalOpen(false)} className="absolute top-3 right-3 text-gray-400 hover:text-gray-800"><CloseIcon size={20} /></button>
                   <h2 className="text-xl font-bold mb-5">{modalMode === 'add' ? 'Tambah Produk Baru' : 'Edit Produk'}</h2>
@@ -252,20 +238,4 @@ const SellerDashboardPage: NextPage = () => {
   );
 }
 
-export const getServerSideProps: GetServerSideProps = async (context) => {
-    try {
-        const cookies = nookies.get(context);
-        const token = await admin.auth().verifyIdToken(cookies.token || '');
-        const { uid } = token;
-        const userDoc = await admin.firestore().collection('users').doc(uid).get();
-        const userRole = userDoc.data()?.role;
-        if (userRole !== 'penjual' && userRole !== 'admin') {
-          return { redirect: { destination: '/login', permanent: false } };
-        }
-        return { props: {} };
-    } catch (error) {
-        return { redirect: { destination: '/login', permanent: false } };
-    }
-};
-
-export default SellerDashboardPage;
+export default withAuth(SellerDashboardPage, ['penjual', 'admin']);

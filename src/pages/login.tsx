@@ -20,11 +20,16 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    // useEffect ini HANYA untuk me-redirect user yang SUDAH LOGIN jika mereka mengunjungi /login lagi
     if (!authLoading && currentUser) {
       const role = currentUser.role;
-      if (role === 'admin') router.push('/admin/dashboard');
-      else if (role === 'penjual') router.push('/dashboard'); // DIUBAH
-      else router.push('/');
+      if (role === 'admin') {
+        router.replace('/admin/dashboard');
+      } else if (role === 'penjual') {
+        router.replace('/dashboard');
+      } else {
+        router.replace('/');
+      }
     }
   }, [currentUser, authLoading, router]);
 
@@ -33,19 +38,8 @@ const LoginPage = () => {
     setLoading(true);
     setError('');
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      const userDocRef = doc(db, "users", user.uid);
-      const userDoc = await getDoc(userDocRef);
-
-      if (userDoc.exists()) {
-        const role = userDoc.data().role;
-        if (role === 'admin') router.push('/admin/dashboard');
-        else if (role === 'penjual') router.push('/dashboard'); // DIUBAH
-        else router.push('/');
-      } else {
-        router.push('/');
-      }
+      // Fungsi ini HANYA melakukan login. Redirect ditangani oleh useEffect setelah state ter-update.
+      await signInWithEmailAndPassword(auth, email, password);
     } catch (err: any) {
       setError('Email atau password salah.');
       setLoading(false);
@@ -57,27 +51,28 @@ const LoginPage = () => {
     setError('');
     const provider = new GoogleAuthProvider();
     try {
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-      const userDocRef = doc(db, "users", user.uid);
-      const userDoc = await getDoc(userDocRef);
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+        const userDocRef = doc(db, "users", user.uid);
+        const userDoc = await getDoc(userDocRef);
 
-      if (!userDoc.exists()) {
-          await setDoc(userDocRef, {
-              uid: user.uid,
-              email: user.email,
-              displayName: user.displayName,
-              role: 'pembeli',
-              createdAt: serverTimestamp(),
-          });
-      }
-      // Setelah login google, biarkan useEffect yang redirect
+        if (!userDoc.exists()) {
+            await setDoc(userDocRef, {
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName,
+                role: 'pembeli',
+                createdAt: serverTimestamp(),
+            });
+        }
+        // Biarkan useEffect yang menangani redirect
     } catch (err: any) {
-      setError(err.message || 'Gagal masuk dengan Google.');
-      setLoading(false);
+        setError(err.message || 'Gagal masuk dengan Google.');
+        setLoading(false);
     }
   };
 
+  // Tampilkan loading jika status auth belum jelas ATAU jika user sudah login (menunggu redirect)
   if (authLoading || currentUser) {
     return (
         <div className="flex justify-center items-center min-h-screen bg-slate-50">
@@ -90,11 +85,11 @@ const LoginPage = () => {
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 via-white to-blue-100">
       <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 bg-white rounded-2xl shadow-xl overflow-hidden">
         <div className="hidden lg:flex flex-col justify-between p-12 bg-blue-600 text-white">
-          <div>
-              <Link href="/" className="flex items-center gap-3"><Store className="h-8 w-8" /><span className="text-2xl font-bold">Si-UMKM</span></Link>
-              <p className="mt-4 text-blue-100 leading-relaxed">Platform terpadu untuk digitalisasi dan kemajuan Usaha Mikro, Kecil, dan Menengah.</p>
-          </div>
-          <p className="text-sm text-blue-200">&copy; {new Date().getFullYear()} Si-UMKM. All Rights Reserved.</p>
+            <div>
+                <Link href="/" className="flex items-center gap-3"><Store className="h-8 w-8" /><span className="text-2xl font-bold">Si-UMKM</span></Link>
+                <p className="mt-4 text-blue-100 leading-relaxed">Platform terpadu untuk digitalisasi dan kemajuan Usaha Mikro, Kecil, dan Menengah.</p>
+            </div>
+            <p className="text-sm text-blue-200">&copy; {new Date().getFullYear()} Si-UMKM. All Rights Reserved.</p>
         </div>
         <div className="p-8 sm:p-12 flex flex-col justify-center">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
@@ -104,14 +99,14 @@ const LoginPage = () => {
                     <div>
                         <label htmlFor="email" className="text-sm font-medium text-gray-700 mb-1 block">Email</label>
                         <div className="relative">
-                            <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1-2 text-gray-400" />
                             <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full border border-gray-300 rounded-md px-4 py-2.5 pl-10 text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all" />
                         </div>
                     </div>
                     <div>
                         <label htmlFor="password">Password</label>
                         <div className="relative">
-                            <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1-2 text-gray-400" />
                             <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full border border-gray-300 rounded-md px-4 py-2.5 pl-10 text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all" />
                         </div>
                     </div>

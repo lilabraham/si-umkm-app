@@ -1,47 +1,44 @@
-// src/components/common/withAuth.tsx
+// LOKASI FILE: src/components/common/withAuth.tsx
 
 import { useRouter } from 'next/router';
-import { useEffect } from 'react';
-import { useAuth } from '@/context/AuthContext';
-import { ComponentType } from 'react';
+import { useAuth, UserRole } from '@/context/AuthContext';
+import { Loader2 } from 'lucide-react';
+import { ComponentType, useEffect } from 'react';
 
-const withAuth = <P extends object>(WrappedComponent: ComponentType<P>) => {
-  const AuthWrapper = (props: P) => {
-    // Ambil currentUser dan juga loading dari context
-    const { currentUser, loading } = useAuth(); 
+const withAuth = <P extends object>(
+  WrappedComponent: ComponentType<P>,
+  allowedRoles: UserRole[]
+) => {
+  const AuthComponent = (props: P) => {
+    const { currentUser, loading } = useAuth();
     const router = useRouter();
 
     useEffect(() => {
-      // Jangan lakukan apa-apa selagi status auth masih loading
-      if (loading) {
-        return;
+      if (!loading) {
+        if (!currentUser) {
+          // Jika tidak ada user setelah loading selesai, tendang ke login
+          router.replace('/login');
+        } else if (!allowedRoles.includes(currentUser.role)) {
+          // Jika peran tidak sesuai, tendang ke halaman utama
+          router.replace('/');
+        }
       }
-      
-      // Jika loading sudah selesai dan TIDAK ADA user, baru redirect
-      if (!currentUser) {
-        router.push('/login');
-      }
-    }, [currentUser, loading, router]); // Tambahkan loading sebagai dependency
+    }, [currentUser, loading, router, allowedRoles]);
 
-    // Selagi loading, tampilkan pesan atau spinner
-    if (loading) {
+    // Selama loading atau jika user tidak valid (akan segera di-redirect oleh useEffect),
+    // tampilkan layar loading untuk mencegah kedipan konten yang salah.
+    if (loading || !currentUser || !allowedRoles.includes(currentUser.role)) {
       return (
-        <div className="flex justify-center items-center min-h-screen">
-          <p>Memeriksa autentikasi...</p>
+        <div className="flex justify-center items-center min-h-screen bg-slate-50">
+          <Loader2 className="animate-spin text-blue-600" size={40} />
         </div>
       );
     }
 
-    // Jika loading selesai dan ada user, tampilkan halaman yang diminta
-    if (currentUser) {
-      return <WrappedComponent {...props} />;
-    }
-
-    // fallback jika terjadi kondisi aneh
-    return null; 
+    // Jika semua pengecekan lolos, tampilkan halaman yang sebenarnya
+    return <WrappedComponent {...props} />;
   };
-
-  return AuthWrapper;
+  return AuthComponent;
 };
 
 export default withAuth;

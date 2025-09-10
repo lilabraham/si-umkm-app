@@ -7,53 +7,53 @@ interface Toko {
   id: string;
   name: string;
   imageUrl: string;
+  productCount: number; // Tambahkan properti ini
 }
 
-// DIUBAH: Interface disesuaikan dengan field yang ada di Firestore Anda
-interface ProductDoc {
-  id: string;
-  shopName: string;  // Ini yang akan kita gunakan
-  imagegirl: string; // Nama field gambar Anda adalah 'imagegirl'
-  // 'shopId' tidak ada di data Anda, jadi kita hapus dari ekspektasi
+interface ProductData {
+  shopId: string;    
+  shopName: string;  
+  imageUrl?: string;
+  imagegirl?: string;
 }
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<Toko[] | { error: string }>
 ) {
-  if (req.method !== 'GET') {
-    res.setHeader('Allow', ['GET']);
-    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
-  }
+  if (req.method !== 'GET') { /* ... */ }
 
   try {
-    const productsCollectionRef = db.collection('products');
-    const productsSnapshot = await productsCollectionRef.get();
-    
-    if (productsSnapshot.empty) {
-      return res.status(200).json([]);
-    }
+    const productsSnapshot = await db.collection('products').get();
+    if (productsSnapshot.empty) return res.status(200).json([]);
 
-    const allProducts = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProductDoc));
+    const allProducts = productsSnapshot.docs.map(doc => doc.data() as ProductData);
 
-    const tokoMap = new Map<string, Toko>();
+    // DIUBAH: Sekarang kita tidak hanya menyimpan data toko, tapi juga menghitung produknya
+    const tokoMap = new Map<string, { name: string; imageUrl: string; productCount: number }>();
+
     for (const product of allProducts) {
-      // DIUBAH: Logika disederhanakan, hanya butuh shopName
-      if (product.shopName) {
-        // DIUBAH: Menggunakan shopName sebagai ID unik di Map
-        if (!tokoMap.has(product.shopName)) {
-          tokoMap.set(product.shopName, {
-            // Karena tidak ada shopId, kita gunakan shopName sebagai ID
-            // Kita ubah menjadi format URL-friendly (slug)
-            id: product.shopName.toLowerCase().replace(/\s+/g, '-'), 
+      if (product.shopId && product.shopName) {
+        if (!tokoMap.has(product.shopId)) {
+          // Jika toko baru, inisialisasi dengan data & hitungan 1
+          tokoMap.set(product.shopId, {
             name: product.shopName,
-            // DIUBAH: Menggunakan 'imagegirl' sebagai sumber gambar
-            imageUrl: product.imagegirl, 
+            imageUrl: product.imageUrl || product.imagegirl || '',
+            productCount: 1, 
           });
+        } else {
+          // Jika toko sudah ada, cukup tambah hitungan produknya
+          const currentToko = tokoMap.get(product.shopId)!;
+          currentToko.productCount++;
         }
       }
     }
-    const uniqueTokoList = Array.from(tokoMap.values());
+
+    // Ubah Map menjadi array dengan format yang benar
+    const uniqueTokoList: Toko[] = Array.from(tokoMap.entries()).map(([id, data]) => ({
+      id,
+      ...data,
+    }));
 
     res.status(200).json(uniqueTokoList);
 

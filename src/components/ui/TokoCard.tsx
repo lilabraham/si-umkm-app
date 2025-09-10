@@ -3,25 +3,26 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { ShoppingBag } from 'lucide-react';
 
-// Tipe data untuk sebuah Toko
+// Tipe data untuk Toko, diperbarui dengan productCount
 interface Toko {
-  id: string; // Ini akan digunakan untuk URL, contoh: "bakso-pak-kumis"
+  id: string;
   name: string;
-  imageUrl: string; // Gambar pemanis untuk toko
+  imageUrl: string;
+  productCount: number; // Tambahan: Jumlah produk di toko
 }
 
-// Properti untuk varian animasi dari Framer Motion
 interface TokoCardProps {
   toko: Toko;
-  variants: any;
+  variants?: any; // Menerima variants dari Framer Motion
 }
 
 const TokoCard = ({ toko, variants }: TokoCardProps) => {
   return (
-    <motion.div variants={variants}>
-      <Link href={`/toko/${toko.id}`} className="block group">
-        <div className="relative overflow-hidden rounded-lg shadow-md aspect-w-16 aspect-h-9">
+    <motion.div variants={variants} className="h-full">
+      <Link href={`/toko/${toko.id}`} className="block group bg-white rounded-xl shadow-md border border-gray-200 hover:shadow-lg hover:border-blue-500 transition-all duration-300 h-full flex flex-col">
+        <div className="relative overflow-hidden rounded-t-xl aspect-w-16 aspect-h-9">
           <Image
             src={toko.imageUrl}
             alt={`Gambar untuk ${toko.name}`}
@@ -30,10 +31,17 @@ const TokoCard = ({ toko, variants }: TokoCardProps) => {
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           />
         </div>
-        <div className="mt-4">
-          <h3 className="text-lg font-bold text-slate-800 transition-colors group-hover:text-blue-600">
+        <div className="p-5 flex-grow flex flex-col">
+          <h3 className="text-lg font-bold text-slate-800 transition-colors group-hover:text-blue-600 flex-grow">
             {toko.name}
           </h3>
+          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
+            <div className="flex items-center gap-1.5">
+              <ShoppingBag size={14} />
+              <span>{toko.productCount} Produk</span>
+            </div>
+            <span className="font-semibold text-blue-600 group-hover:underline">Lihat Toko →</span>
+          </div>
         </div>
       </Link>
     </motion.div>

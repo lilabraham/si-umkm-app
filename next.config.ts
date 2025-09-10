@@ -22,6 +22,10 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
+      { // <-- TAMBAHKAN BLOK INI
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
+      }
       // ==========================================================
     ],
   },
