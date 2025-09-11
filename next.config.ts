@@ -5,28 +5,23 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'images.unsplash.com',
-        port: '',
-        pathname: '/**',
       },
       {
         protocol: 'https',
         hostname: 'img.freepik.com',
-        port: '',
-        pathname: '/**',
       },
-      // ==========================================================
-      // PERUBAHAN DI SINI: Menambahkan konfigurasi untuk placehold.co
       {
         protocol: 'https',
-        hostname: 'placehold.co',
-        port: '',
-        pathname: '/**',
+        hostname: 'res.cloudinary.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
       },
       { // <-- TAMBAHKAN BLOK INI
         protocol: 'https',
-        hostname: 'res.cloudinary.com',
-      }
-      // ==========================================================
+        hostname: 'lh3.googleusercontent.com',
+      },
     ],
   },
 };

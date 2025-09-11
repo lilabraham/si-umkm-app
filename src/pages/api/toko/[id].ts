@@ -1,8 +1,6 @@
 // LOKASI FILE: src/pages/api/toko/[id].ts
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-// DIHAPUS: Impor dari library sisi klien tidak lagi digunakan
-// import { collection, getDocs, query, where, limit } from 'firebase/firestore'; 
 import { db } from '@/lib/firebaseAdmin';
 
 interface Toko {
@@ -28,27 +26,24 @@ export default async function handler(
   }
 
   try {
-    // DIUBAH: Menggunakan metode query yang benar dari Firebase Admin SDK
-    const productsRef = db.collection('products');
-    const query = productsRef.where("shopId", "==", id).limit(1);
-    const querySnapshot = await query.get();
+    // LOGIKA DIUBAH: Langsung ambil data dari koleksi 'users' berdasarkan ID penjual/toko
+    const userDocRef = db.collection('users').doc(id);
+    const userDoc = await userDocRef.get();
 
-    if (querySnapshot.empty) {
+    if (!userDoc.exists) {
       return res.status(404).json({ error: 'Toko tidak ditemukan.' });
     }
-
-    const firstProduct = querySnapshot.docs[0].data();
-
-    // Pastikan field yang dibutuhkan ada sebelum membuat respons
-    if (!firstProduct.shopName || !firstProduct.imageUrl) {
-        return res.status(500).json({ error: 'Data produk tidak lengkap.' });
+    
+    const userData = userDoc.data();
+    if (!userData) {
+      return res.status(404).json({ error: 'Data toko tidak lengkap.' });
     }
 
     const tokoData: Toko = {
       id: id,
-      name: firstProduct.shopName,
-      imageUrl: firstProduct.imageUrl,
-      description: `Produk-produk berkualitas dari ${firstProduct.shopName}.`,
+      name: userData.shopName || userData.displayName || 'Nama Toko Belum Diatur',
+      imageUrl: userData.shopImageUrl || '', // Mengambil gambar utama dari profil
+      description: userData.description || `Produk-produk berkualitas dari ${userData.shopName}`,
     };
 
     res.status(200).json(tokoData);

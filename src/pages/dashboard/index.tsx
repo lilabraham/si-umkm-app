@@ -5,7 +5,7 @@ import type { NextPage } from 'next';
 import Head from 'next/head';
 import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
-import { collection, addDoc, serverTimestamp, query, where, getDocs, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs, deleteDoc, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { UploadCloud, Edit, Trash2, X as CloseIcon, Image as ImageIcon, Loader2, Plus, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -35,7 +35,6 @@ const SellerDashboardPage: NextPage = () => {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // FUNGSI YANG HILANG, SEKARANG SUDAH DITAMBAHKAN KEMBALI
   const fetchMyProducts = async () => {
     if (!currentUser) return;
     setIsLoading(true);
@@ -53,7 +52,9 @@ const SellerDashboardPage: NextPage = () => {
   };
 
   useEffect(() => {
-    fetchMyProducts();
+    if(currentUser) {
+        fetchMyProducts();
+    }
   }, [currentUser]);
   
   const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
@@ -94,6 +95,7 @@ const SellerDashboardPage: NextPage = () => {
     if (!currentUser) return;
     setIsSubmitting(true);
     setError(null);
+    
     try {
         let imageUrl = currentProduct.imageUrl || '';
         if (productImageFile) {
@@ -101,24 +103,30 @@ const SellerDashboardPage: NextPage = () => {
             const uploadRes = await fetch('/api/upload', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ file: fileBase64 }),
+                body: JSON.stringify({ file: fileBase64, folder: 'produk' }),
             });
             const uploadData = await uploadRes.json();
             if (!uploadRes.ok) throw new Error(uploadData.error || 'Gagal upload gambar.');
             imageUrl = uploadData.secure_url;
         }
-        if (!imageUrl) throw new Error("Gambar produk wajib diisi.");
+        if (!imageUrl && modalMode === 'add') throw new Error("Gambar produk wajib diisi.");
         
         const { id, ...productData } = currentProduct;
+        
+        const userDocRef = doc(db, "users", currentUser.uid);
+        const userDoc = await getDoc(userDocRef);
+        const correctShopName = userDoc.exists() ? userDoc.data().shopName : currentUser.displayName;
+        
         const dataToSave = {
             name: productData.name || '',
             price: Number(productData.price || 0),
             description: productData.description || '',
             imageUrl: imageUrl,
             shopId: currentUser.uid,
-            shopName: currentUser.displayName || currentUser.email,
+            shopName: correctShopName,
             ownerId: currentUser.uid,
         };
+
         if (modalMode === 'add') {
             await addDoc(collection(db, "products"), { ...dataToSave, createdAt: serverTimestamp() });
         } else {
@@ -147,7 +155,7 @@ const SellerDashboardPage: NextPage = () => {
   return (
     <div className="bg-slate-50 min-h-screen">
       <Head>
-          <title>Dashboard Penjual - SI-UMKM</title>
+        <title>Dashboard Penjual - SI-UMKM</title>
       </Head>
       <div className="container mx-auto px-4 py-8">
         <motion.div className="flex justify-between items-center mb-8" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
@@ -195,36 +203,48 @@ const SellerDashboardPage: NextPage = () => {
         
         <AnimatePresence>
             {isModalOpen && (
-              <motion.div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <motion.div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg relative" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}>
-                  <button onClick={() => setIsModalOpen(false)} className="absolute top-3 right-3 text-gray-400 hover:text-gray-800"><CloseIcon size={20} /></button>
+              <motion.div 
+                onClick={() => setIsModalOpen(false)}
+                className="fixed inset-0 bg-black/70 flex justify-center items-center z-50 p-4 backdrop-blur-sm" 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }}
+              >
+                <motion.div 
+                  onClick={(e) => e.stopPropagation()}
+                  className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg relative" 
+                  initial={{ scale: 0.9, y: 20, opacity: 0 }} 
+                  animate={{ scale: 1, y: 0, opacity: 1 }} 
+                  exit={{ scale: 0.9, y: 20, opacity: 0 }}
+                >
                   <h2 className="text-xl font-bold mb-5">{modalMode === 'add' ? 'Tambah Produk Baru' : 'Edit Produk'}</h2>
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label htmlFor="name" className="text-sm font-medium">Nama Produk</label>
-                        <input type="text" name="name" id="name" defaultValue={currentProduct.name || ''} onChange={handleFormChange} className="mt-1 w-full border-gray-300 rounded-md p-2" required />
+                        <label htmlFor="name" className="text-sm font-medium text-gray-700">Nama Produk</label>
+                        <input type="text" name="name" id="name" defaultValue={currentProduct.name || ''} onChange={handleFormChange} className="mt-1 w-full border-gray-300 rounded-md p-3 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" required />
                     </div>
                     <div>
-                        <label htmlFor="price" className="text-sm font-medium">Harga</label>
-                        <input type="number" name="price" id="price" defaultValue={currentProduct.price || ''} onChange={handleFormChange} className="mt-1 w-full border-gray-300 rounded-md p-2" required />
+                        <label htmlFor="price" className="text-sm font-medium text-gray-700">Harga</label>
+                        <input type="number" name="price" id="price" defaultValue={currentProduct.price || ''} onChange={handleFormChange} className="mt-1 w-full border-gray-300 rounded-md p-3 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required />
                     </div>
                     <div>
-                        <label htmlFor="description" className="text-sm font-medium">Deskripsi</label>
-                        <textarea name="description" id="description" defaultValue={currentProduct.description || ''} onChange={handleFormChange} rows={3} className="mt-1 w-full border-gray-300 rounded-md p-2 resize-none" required />
+                        {/* DI PERBAIKI: Tag penutup yang salah adalah </p>, seharusnya </label> */}
+                        <label htmlFor="description" className="text-sm font-medium text-gray-700">Deskripsi</label>
+                        <textarea name="description" id="description" defaultValue={currentProduct.description || ''} onChange={handleFormChange} rows={4} className="mt-1 w-full border-gray-300 rounded-md p-3 shadow-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required />
                     </div>
                     <div>
-                      <label className="text-sm font-medium">Foto Produk</label>
-                      <div className="mt-1 border-2 border-dashed rounded-md p-6 text-center">
+                      <label className="text-sm font-medium text-gray-700">Foto Produk</label>
+                      <div className="mt-1 border-2 border-dashed rounded-lg p-6 text-center">
                         <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" id="file-upload"/>
                         {previewUrl ? <Image src={previewUrl} alt="Preview" width={150} height={150} className="mx-auto mb-2 rounded-md"/> : <ImageIcon className="mx-auto h-12 w-12 text-gray-400"/>}
-                        <button type="button" onClick={() => fileInputRef.current?.click()} className="text-sm text-blue-600 hover:underline">
+                        <button type="button" onClick={() => fileInputRef.current?.click()} className="text-sm font-semibold text-blue-600 hover:underline mt-2">
                           {previewUrl ? 'Ganti Gambar' : 'Pilih Gambar'}
                         </button>
                       </div>
                     </div>
                     {error && <p className="text-red-500 text-sm">{error}</p>}
-                    <div className="flex justify-end pt-2">
-                        <button type="submit" className="bg-blue-600 text-white font-semibold py-2 px-5 rounded-md" disabled={isSubmitting}>
+                    <div className="flex justify-end pt-4">
+                        <button type="submit" className="bg-blue-600 text-white font-semibold py-2 px-5 rounded-md shadow-sm hover:bg-blue-700 transition-colors" disabled={isSubmitting}>
                             {isSubmitting ? <Loader2 className="animate-spin"/> : (modalMode === 'add' ? 'Simpan Produk' : 'Simpan Perubahan')}
                         </button>
                     </div>
