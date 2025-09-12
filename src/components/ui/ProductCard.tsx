@@ -2,14 +2,19 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState, useEffect } from 'react'; // PERBAIKAN: Impor useEffect
-import { Star, Store, ImageIcon } from 'lucide-react'; // PERBAIKAN: Impor ImageIcon untuk placeholder
+import { useState, useEffect } from 'react';
+import { Star, Store, ImageIcon } from 'lucide-react';
 import { motion, type Variants } from 'framer-motion';
 
-// Interface tetap sama
 interface Product {
-  id: string; name: string; shopName: string; price: number; rating?: number; imageUrl: string;
+  id: string; 
+  name: string; 
+  shopName: string; 
+  price: number; 
+  rating?: number; 
+  imageUrl?: string;
 }
+
 interface ProductCardProps {
   product: Product;
   variants?: Variants;
@@ -23,39 +28,34 @@ const formatCurrency = (price: number) => {
 };
 
 const ProductCard = ({ product, variants, variant = 'default' }: ProductCardProps) => {
-  // PERBAIKAN UTAMA:
-  // 1. `imgSrc` di-set null pada awalnya.
-  // 2. `isLoading` ditambahkan untuk menampilkan placeholder.
-  const [imgSrc, setImgSrc] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [imgSrc, setImgSrc] = useState<string | null>(product.imageUrl || null);
+  const [isLoading, setIsLoading] = useState(!product.imageUrl);
   const fallbackImg = 'https://placehold.co/600x400/EEE/31343C?text=Gagal+Muat';
 
-  // 3. useEffect akan berjalan di sisi client untuk mengambil URL gambar.
-  // Ini menyelesaikan masalah 'large-page-data' TANPA menghilangkan gambar.
   useEffect(() => {
-    const fetchImage = async () => {
-      setIsLoading(true);
-      try {
-        // Kita panggil API untuk satu produk saja untuk mendapatkan imageUrl
-        const res = await fetch(`/api/produk/${product.id}`);
-        if (!res.ok) throw new Error('Gagal mengambil gambar');
-        const fullProductData: Product = await res.json();
-        
-        if (fullProductData.imageUrl) {
-          setImgSrc(fullProductData.imageUrl);
-        } else {
-          setImgSrc(fallbackImg);
-        }
-      } catch (error) {
-        console.error("Gagal fetch gambar produk:", error);
-        setImgSrc(fallbackImg);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchImage();
-  }, [product.id]); // Akan berjalan setiap kali ID produk berubah
+    if (!product.imageUrl) {
+        const fetchImage = async () => {
+            setIsLoading(true);
+            try {
+                const res = await fetch(`/api/produk/${product.id}`);
+                if (!res.ok) throw new Error('Gagal mengambil gambar');
+                const fullProductData: { imageUrl: string } = await res.json();
+                
+                if (fullProductData.imageUrl) {
+                    setImgSrc(fullProductData.imageUrl);
+                } else {
+                    setImgSrc(fallbackImg);
+                }
+            } catch (error) {
+                console.error("Gagal fetch gambar produk:", error);
+                setImgSrc(fallbackImg);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchImage();
+    }
+  }, [product.id, product.imageUrl]);
 
   const isCompact = variant === 'compact';
 
@@ -71,7 +71,6 @@ const ProductCard = ({ product, variants, variant = 'default' }: ProductCardProp
         whileHover={!isCompact ? { scale: 1.03, y: -5 } : {}}
         whileTap={!isCompact ? { scale: 0.98 } : {}}
       >
-        {/* PERBAIKAN: Tampilkan skeleton/placeholder saat gambar sedang dimuat */}
         <div className={`overflow-hidden relative ${isCompact ? 'h-40' : 'h-48'} ${isLoading ? 'bg-slate-200 animate-pulse' : ''}`}>
           {isLoading ? (
             <div className="w-full h-full flex items-center justify-center">
@@ -86,8 +85,6 @@ const ProductCard = ({ product, variants, variant = 'default' }: ProductCardProp
             />
           )}
         </div>
-
-        {/* Sisa konten tidak berubah, hanya datanya yang sekarang lengkap */}
         <div className={`p-4 flex flex-col flex-grow ${isCompact ? 'bg-white' : 'bg-card'}`}>
           {!isCompact && (
             <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 mb-2">

@@ -8,36 +8,52 @@ import { useAuth } from '@/context/AuthContext';
 import { Star, MessageSquare, Send, UserCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { db } from '@/lib/firebaseAdmin'; // Menggunakan Admin SDK untuk performa
 
+// --- INTERFACE / TIPE DATA ---
 interface Product {
-  id: string; name: string; price: number; description: string; shopName: string; imageUrl: string; ownerId: string;
+  id: string; 
+  name: string; 
+  price: number; 
+  description: string; 
+  shopName: string; 
+  imageUrl: string; 
+  ownerId: string;
 }
 interface Review {
-  id: string; userName: string; rating: number; comment: string; createdAt: { seconds: number, nanoseconds: number } | null;
+  id: string; 
+  userName: string; 
+  rating: number; 
+  comment: string; 
+  createdAt: { seconds: number, nanoseconds: number } | null;
+}
+interface Seller {
+    whatsapp: string;
 }
 interface ProductDetailPageProps {
   product: Product | null;
   initialReviews: Review[];
+  seller: Seller | null;
 }
 
+// --- KOMPONEN BANTUAN ---
 const StarRating = ({ rating, size = 16 }: { rating: number, size?: number }) => (
   <div className="flex items-center">
     {[...Array(5)].map((_, i) => (
-      <Star key={i} size={size} className={i < rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'} />
+      <Star key={i} size={size} className={i < Math.round(rating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'} />
     ))}
   </div>
 );
 
-const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialReviews }) => {
+// --- KOMPONEN HALAMAN UTAMA ---
+const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialReviews, seller }) => {
   const { currentUser } = useAuth();
   const [reviews, setReviews] = useState<Review[]>(initialReviews);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [isMounted, setIsMounted] = useState(false);
-  useEffect(() => { setIsMounted(true); }, []);
-
+  
   const handleReviewSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (rating === 0 || !comment) {
@@ -57,7 +73,8 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialR
         body: JSON.stringify({
           productId: product!.id,
           userId: currentUser.uid,
-          userName: currentUser.email?.split('@')[0] || 'Anonim',
+          // PERBAIKAN: Menggunakan displayName (nama lengkap) jika ada
+          userName: currentUser.displayName || 'Pengguna Terdaftar',
           rating,
           comment,
         }),
@@ -87,10 +104,13 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialR
     };
   }, [reviews]);
 
-  if (!product) {
+  if (!product || !seller) {
     return <div className="text-center py-20"><h1>Produk tidak ditemukan.</h1></div>;
   }
   
+  // LOGIKA BARU: Membuat link WhatsApp
+  const formattedWhatsapp = `https://wa.me/${seller.whatsapp.startsWith('0') ? '62' + seller.whatsapp.substring(1) : seller.whatsapp}`;
+
   return (
     <div className="bg-[#F8FAFC] min-h-screen">
       <Head>
@@ -124,20 +144,22 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialR
           </motion.div>
 
           <div className="w-full">
-            <p className="text-sm font-semibold text-blue-600">{product.shopName}</p>
+            <Link href={`/toko/${product.ownerId}`} className="text-sm font-semibold text-blue-600 hover:underline">{product.shopName}</Link>
             <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mt-1">{product.name}</h1>
             <p className="text-2xl lg:text-3xl font-bold text-slate-800 mt-4">
               Rp {product.price.toLocaleString('id-ID')}
             </p>
 
-            <motion.button 
-              className="w-full mt-6 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+            {/* LOGIKA BARU: Tombol WhatsApp */}
+            <a 
+              href={formattedWhatsapp}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full mt-6 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white font-semibold px-6 py-3 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
             >
               <MessageSquare size={20} />
-              Hubungi Penjual
-            </motion.button>
+              Hubungi Penjual via WhatsApp
+            </a>
             
             <div className="border-t border-slate-200 pt-4 mt-6">
                 <h2 className="text-lg font-semibold text-slate-800">Deskripsi Produk</h2>
@@ -161,7 +183,7 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialR
             </div>
           )}
 
-          {isMounted && currentUser && (
+          {currentUser ? (
             <div className="bg-white p-6 rounded-xl mb-8 border shadow-sm">
               <h3 className="text-lg font-semibold mb-4 text-slate-800">Tulis Ulasan Anda</h3>
               <form onSubmit={handleReviewSubmit}>
@@ -177,7 +199,7 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialR
                 </div>
                 <div className="mb-4">
                   <label htmlFor="comment" className="block mb-2 text-sm font-medium text-slate-700">Komentar</label>
-                  <textarea id="comment" rows={4} className="w-full p-3 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition" value={comment} onChange={(e) => setComment(e.target.value)}></textarea>
+                  <textarea id="comment" rows={4} className="w-full p-3 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-400 transition" value={comment} onChange={(e) => setComment(e.target.value)}></textarea>
                 </div>
                 <div className="flex items-center gap-4">
                     <motion.button type="submit" className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-sm hover:bg-blue-700 disabled:bg-blue-400 transition-all" disabled={loading} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
@@ -187,9 +209,7 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialR
                 </div>
               </form>
             </div>
-          )}
-
-          {isMounted && !currentUser && (
+          ) : (
             <div className="bg-slate-100 text-slate-600 text-sm px-4 py-3 rounded-lg border border-slate-200 text-center mb-8">
               <p><Link href="/login" className="text-blue-600 font-semibold hover:underline">Login</Link> untuk memberikan ulasan.</p>
             </div>
@@ -198,13 +218,7 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialR
           <div className="space-y-4">
             {reviews.length > 0 ? (
               reviews.map((review) => (
-                <motion.div 
-                  key={review.id} 
-                  className="bg-white rounded-lg shadow-sm p-4 border border-slate-200 transition hover:shadow-md"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                >
+                <motion.div key={review.id} className="bg-white rounded-lg shadow-sm p-4 border border-slate-200" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
                   <div className="flex items-start">
                     <UserCircle className="h-10 w-10 text-slate-400" />
                     <div className="ml-4">
@@ -227,41 +241,52 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialR
 
 export const getStaticPaths: GetStaticPaths = async () => {
     try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/produk`);
-        if (!res.ok) {
-            console.error("Failed to fetch products for paths");
-            return { paths: [], fallback: 'blocking' };
-        }
-        const products: Product[] = await res.json();
-        const paths = products.map((product) => ({
-            params: { id: product.id },
-        }));
+        const productsSnapshot = await db.collection('products').get();
+        const paths = productsSnapshot.docs.map(doc => ({ params: { id: doc.id } }));
         return { paths, fallback: 'blocking' };
     } catch (error) {
-        console.error("Error in getStaticPaths: ", error);
         return { paths: [], fallback: 'blocking' };
     }
 };
+
 export const getStaticProps: GetStaticProps = async (context) => {
     const { id } = context.params as { id: string };
     try {
-      const productRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/produk/${id}`);
-      if (!productRes.ok) {
-        return { notFound: true };
-      }
-      const product: Product = await productRes.json();
-      const reviewsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews?productId=${product.id}`);
-      const initialReviews: Review[] = reviewsRes.ok ? await reviewsRes.json() : [];
-      return {
-        props: {
-          product,
-          initialReviews: initialReviews.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)),
-        },
-        revalidate: 10,
-      };
+        const productDoc = await db.collection('products').doc(id).get();
+        if (!productDoc.exists) return { notFound: true };
+        
+        const productData = productDoc.data()!;
+        
+        // Mengambil data penjual untuk mendapatkan nomor WhatsApp
+        const sellerDoc = await db.collection('users').doc(productData.ownerId).get();
+        
+        const product: Product = {
+          id: productDoc.id,
+          name: productData.name,
+          price: productData.price,
+          description: productData.description,
+          shopName: productData.shopName,
+          imageUrl: productData.imageUrl,
+          ownerId: productData.ownerId,
+        };
+        
+        const seller: Seller = {
+          whatsapp: sellerDoc.exists ? sellerDoc.data()!.whatsapp : '',
+        };
+
+        const reviewsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews?productId=${product.id}`);
+        const initialReviews: Review[] = reviewsRes.ok ? await reviewsRes.json() : [];
+        
+        return {
+          props: {
+            product: JSON.parse(JSON.stringify(product)),
+            initialReviews: initialReviews.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)),
+            seller,
+          },
+          revalidate: 10,
+        };
     } catch (error) {
-      console.error(`Error fetching data for product ${id}:`, error);
-      return { notFound: true };
+        return { notFound: true };
     }
 };
 
