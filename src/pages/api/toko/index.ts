@@ -1,62 +1,60 @@
 // LOKASI FILE: src/pages/api/toko/index.ts
-
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { db } from '@/lib/firebaseAdmin';
 
-interface Toko {
-  id: string;
-  name: string;
-  imageUrl: string;
-  productCount: number;
+// Helper: ambil jumlah produk ownerId via Aggregation count()
+async function getProductCountByOwner(ownerId: string) {
+  try {
+    const productsRef = db.collection('products').where('ownerId', '==', ownerId);
+    const agg = await productsRef.count().get();
+    return agg.data().count || 0;
+  } catch {
+    return 0;
+  }
 }
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse<Toko[] | { error: string }>
-) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    res.setHeader('Allow', ['GET']);
-    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+    res.setHeader('Allow', 'GET');
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
   try {
-    // 1. Ambil semua PENGGUNA yang perannya 'penjual'
-    const sellersSnapshot = await db.collection('users').where('role', '==', 'penjual').get();
-    if (sellersSnapshot.empty) {
-      return res.status(200).json([]);
-    }
-    
-    // 2. Ambil semua PRODUK untuk dihitung
-    const productsSnapshot = await db.collection('products').get();
-    const allProducts = productsSnapshot.docs.map(doc => doc.data());
+    // asumsi: users berperan sebagai toko saat role === 'penjual'
+    const usersSnap = await db.collection('users').where('role', '==', 'penjual').get();
 
-    // 3. Buat peta untuk menghitung jumlah produk per toko
-    const productCounts = new Map<string, number>();
-    for (const product of allProducts) {
-      if (product.ownerId) {
-        productCounts.set(product.ownerId, (productCounts.get(product.ownerId) || 0) + 1);
-      }
-    }
+    const stores = await Promise.all(
+      usersSnap.docs.map(async (docu) => {
+        const u = docu.data() || {};
+        const id = docu.id;
 
-    // 4. Buat daftar toko final berdasarkan data profil penjual
-    const tokoList: Toko[] = sellersSnapshot.docs.map(doc => {
-      const sellerData = doc.data();
-      const sellerId = doc.id;
+        // Urutan fallback foto toko: shopImageUrl -> photoURL -> ''
+        const imageUrl = u.shopImageUrl || u.photoURL || '';
 
-      return {
-        id: sellerId,
-        name: sellerData.shopName || sellerData.displayName || 'Nama Toko Belum Diatur',
-        // Mengambil gambar utama dari profil penjual (shopImageUrl)
-        imageUrl: sellerData.shopImageUrl || '', 
-        // Mengambil jumlah produk dari hasil hitungan
-        productCount: productCounts.get(sellerId) || 0,
-      };
-    });
+        // Nama toko fallback: shopName -> displayName -> 'Toko'
+        const name = u.shopName || u.displayName || 'Toko';
 
-    res.status(200).json(tokoList);
+        // Opsional bio/desc (kalau ada)
+        const description = u.description || '';
 
-  } catch (error) {
-    console.error('Error fetching toko list:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+        // ⬇️ Pakai nilai denormalisasi bila tersedia, fallback ke aggregation count
+        const rawCount =
+          typeof u.productCount === 'number'
+           ? u.productCount
+            : await getProductCountByOwner(id);
+
+        const productCount = Math.max(0, Number(rawCount) || 0);
+
+        return { id, name, imageUrl, productCount, description };
+      })
+    );
+
+    // (opsional) sort nama toko biar rapi
+    stores.sort((a, b) => a.name.localeCompare(b.name));
+
+    return res.status(200).json(stores);
+  } catch (e: any) {
+    console.error('[GET /api/toko] Error:', e);
+    return res.status(500).json({ error: 'Failed to fetch stores' });
   }
 }

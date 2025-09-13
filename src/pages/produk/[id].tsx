@@ -3,32 +3,42 @@
 import { GetStaticPaths, GetStaticProps, NextPage } from 'next';
 import Head from 'next/head';
 import Image from 'next/image';
-import { useState, useEffect, FormEvent, useMemo } from 'react';
-import { useAuth } from '@/context/AuthContext';
-import { Star, MessageSquare, Send, UserCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { db } from '@/lib/firebaseAdmin'; // Menggunakan Admin SDK untuk performa
+import { useState, FormEvent, useMemo } from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { db } from '@/lib/firebaseAdmin';
+import Breadcrumb from '@/components/common/Breadcrumb';
+import {
+  Star,
+  MessageSquare,
+  Send,
+  UserCircle,
+  Tag,
+  ChevronDown,
+  Loader2,
+} from 'lucide-react';
 
-// --- INTERFACE / TIPE DATA ---
+/* ================== Types ================== */
 interface Product {
-  id: string; 
-  name: string; 
-  price: number; 
-  description: string; 
-  shopName: string; 
-  imageUrl: string; 
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+  shopName: string;
+  imageUrl: string;
   ownerId: string;
+  category?: string;
 }
 interface Review {
-  id: string; 
-  userName: string; 
-  rating: number; 
-  comment: string; 
-  createdAt: { seconds: number, nanoseconds: number } | null;
+  id: string;
+  userName: string;
+  rating: number;
+  comment: string;
+  createdAt: { seconds: number; nanoseconds: number } | null;
 }
 interface Seller {
-    whatsapp: string;
+  whatsapp: string;
 }
 interface ProductDetailPageProps {
   product: Product | null;
@@ -36,80 +46,127 @@ interface ProductDetailPageProps {
   seller: Seller | null;
 }
 
-// --- KOMPONEN BANTUAN ---
-const StarRating = ({ rating, size = 16 }: { rating: number, size?: number }) => (
+/* ================== Helpers ================== */
+const StarRating = ({ rating, size = 14 }: { rating: number; size?: number }) => (
   <div className="flex items-center">
     {[...Array(5)].map((_, i) => (
-      <Star key={i} size={size} className={i < Math.round(rating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'} />
+      <Star
+        key={i}
+        size={size}
+        className={i < Math.round(rating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}
+      />
     ))}
   </div>
 );
 
-// --- KOMPONEN HALAMAN UTAMA ---
-const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialReviews, seller }) => {
+const formatDate = (ts: Review['createdAt']) => {
+  if (!ts || typeof ts.seconds !== 'number') return '';
+  const d = new Date(ts.seconds * 1000);
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+};
+
+type SortKey = 'suggested' | 'recent' | 'highest' | 'lowest';
+
+/* ================== Page ================== */
+const ProductDetailPage: NextPage<ProductDetailPageProps> = ({
+  product,
+  initialReviews,
+  seller,
+}) => {
   const { currentUser } = useAuth();
   const [reviews, setReviews] = useState<Review[]>(initialReviews);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
-  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  
+  const [loading, setLoading] = useState(false);
+
+  // UI kecil: form ulasan disembunyikan sampai user klik
+  const [showForm, setShowForm] = useState(false);
+
+  const [sortKey, setSortKey] = useState<SortKey>('suggested');
+  const [openSort, setOpenSort] = useState(false);
+
   const handleReviewSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (rating === 0 || !comment) {
-      setMessage("Rating dan komentar wajib diisi.");
+    if (rating === 0 || !comment.trim()) {
+      setMessage('Rating dan komentar wajib diisi.');
       return;
     }
     if (!currentUser) {
-      setMessage("Anda harus login untuk memberikan ulasan.");
+      setMessage('Anda harus login untuk memberikan ulasan.');
       return;
     }
     setLoading(true);
     setMessage('');
     try {
-      const response = await fetch('/api/reviews', {
+      const res = await fetch('/api/reviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           productId: product!.id,
           userId: currentUser.uid,
-          // PERBAIKAN: Menggunakan displayName (nama lengkap) jika ada
           userName: currentUser.displayName || 'Pengguna Terdaftar',
           rating,
           comment,
         }),
       });
-      if (!response.ok) throw new Error("Gagal mengirim ulasan.");
-      const newReview = await response.json();
-      setReviews(prev => [newReview, ...prev].sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)));
+      if (!res.ok) throw new Error('Gagal mengirim ulasan.');
+      const newReview = await res.json();
+      if (!newReview.createdAt) {
+        newReview.createdAt = { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 };
+      }
+      setReviews(prev =>
+        [newReview, ...prev].sort(
+          (a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0),
+        ),
+      );
       setRating(0);
       setComment('');
-    } catch (error) {
-      if (error instanceof Error) {
-        setMessage(error.message || "Terjadi kesalahan.");
-      }
+      setShowForm(false);
+    } catch (err: any) {
+      setMessage(err.message || 'Terjadi kesalahan.');
     } finally {
       setLoading(false);
     }
   };
 
   const { averageRating, totalReviews } = useMemo(() => {
-    if (!reviews || reviews.length === 0) {
-      return { averageRating: 0, totalReviews: 0 };
-    }
-    const totalRating = reviews.reduce((acc, review) => acc + review.rating, 0);
-    return {
-      averageRating: totalRating / reviews.length,
-      totalReviews: reviews.length,
-    };
+    if (!reviews.length) return { averageRating: 0, totalReviews: 0 };
+    const total = reviews.reduce((acc, r) => acc + r.rating, 0);
+    return { averageRating: total / reviews.length, totalReviews: reviews.length };
   }, [reviews]);
 
+  const sortedReviews = useMemo(() => {
+    const copy = [...reviews];
+    switch (sortKey) {
+      case 'recent':
+      case 'suggested':
+        return copy.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+      case 'highest':
+        return copy.sort((a, b) => b.rating - a.rating);
+      case 'lowest':
+        return copy.sort((a, b) => a.rating - b.rating);
+      default:
+        return copy;
+    }
+  }, [reviews, sortKey]);
+
   if (!product || !seller) {
-    return <div className="text-center py-20"><h1>Produk tidak ditemukan.</h1></div>;
+    return (
+      <div className="text-center py-20">
+        <h1>Produk tidak ditemukan.</h1>
+      </div>
+    );
   }
-  
-  // LOGIKA BARU: Membuat link WhatsApp
-  const formattedWhatsapp = `https://wa.me/${seller.whatsapp.startsWith('0') ? '62' + seller.whatsapp.substring(1) : seller.whatsapp}`;
+
+  const wa = seller.whatsapp
+    ? `https://wa.me/${seller.whatsapp.startsWith('0') ? '62' + seller.whatsapp.slice(1) : seller.whatsapp}`
+    : '';
+
+  const backToStoreHref =
+    product.category && product.category !== ''
+      ? { pathname: `/toko/${product.ownerId}`, query: { kategori: product.category } }
+      : { pathname: `/toko/${product.ownerId}` };
 
   return (
     <div className="bg-[#F8FAFC] min-h-screen">
@@ -118,176 +175,316 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialR
         <meta name="description" content={product.description} />
       </Head>
 
-      <motion.div 
-        className="container mx-auto px-4 sm:px-6 lg:px-8 py-10"
+      <motion.div
+        className="container mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-10"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.5 }}
+        transition={{ duration: 0.25 }}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-16 items-start">
-          
-          <motion.div 
-            className="sticky top-24"
-            whileHover={{ scale: 1.02 }}
-            transition={{ type: 'spring', stiffness: 300 }}
-          >
-            <div className="relative w-full aspect-square max-h-[500px] bg-white rounded-xl shadow-lg p-4 border">
+        <Breadcrumb
+          items={[
+            { label: 'Beranda', href: '/' },
+            { label: product.shopName, href: `/toko/${product.ownerId}` },
+            { label: product.name }, // aktif
+          ]}
+          className="mb-4"
+        />
+
+        {/* ================== HERO: gambar sedang kiri, info ringkas kanan ================== */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+          {/* KIRI: GAMBAR (ukuran sedang, proporsional, tanpa box tebal) */}
+          <section className="w-full">
+            <div className="relative aspect-[5/4] w-full overflow-hidden rounded-lg shadow-sm">
               <Image
                 src={product.imageUrl}
-                alt={`Foto produk ${product.name}`}
+                alt={product.name}
                 fill
-                className="object-contain"
-                sizes="(max-width: 768px) 100vw, 50vw"
-                onError={(e) => { e.currentTarget.src = 'https://placehold.co/600x600/EEE/31343C?text=Gambar+Rusak'; }}
+                className="object-cover"
+                sizes="(max-width: 1024px) 100vw, 520px"
+                priority
               />
             </div>
-          </motion.div>
+          </section>
 
-          <div className="w-full">
-            <Link href={`/toko/${product.ownerId}`} className="text-sm font-semibold text-blue-600 hover:underline">{product.shopName}</Link>
-            <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mt-1">{product.name}</h1>
-            <p className="text-2xl lg:text-3xl font-bold text-slate-800 mt-4">
+          {/* KANAN: INFO RINGKAS */}
+          <aside className="w-full">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+              <Link
+                href={`/toko/${product.ownerId}`}
+                className="font-semibold text-blue-600 hover:underline"
+              >
+                {product.shopName}
+              </Link>
+              {product.category && (
+                <>
+                  <span className="text-slate-400">•</span>
+                  <Link
+                    href={backToStoreHref}
+                    className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] text-gray-600 hover:bg-slate-50"
+                    title="Lihat kategori ini di toko"
+                  >
+                    <Tag size={11} />
+                    {product.category}
+                  </Link>
+                </>
+              )}
+            </div>
+
+            <h1 className="mt-1 text-2xl font-bold text-slate-900">{product.name}</h1>
+            <p className="mt-2 text-xl font-semibold text-slate-900">
               Rp {product.price.toLocaleString('id-ID')}
             </p>
 
-            {/* LOGIKA BARU: Tombol WhatsApp */}
-            <a 
-              href={formattedWhatsapp}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full mt-6 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white font-semibold px-6 py-3 rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
-            >
-              <MessageSquare size={20} />
-              Hubungi Penjual via WhatsApp
-            </a>
-            
-            <div className="border-t border-slate-200 pt-4 mt-6">
-                <h2 className="text-lg font-semibold text-slate-800">Deskripsi Produk</h2>
-                <p className="text-sm text-slate-600 leading-relaxed mt-2">{product.description}</p>
+            <p className="mt-3 text-sm text-slate-700 leading-relaxed">{product.description}</p>
+
+            {/* CTA WA - kecil, di bawah deskripsi (desktop & tablet) */}
+            {wa && (
+              <a
+                href={wa}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-5 inline-flex items-center justify-center gap-2 rounded-md bg-green-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-green-700 transition"
+              >
+                <MessageSquare size={16} />
+                Hubungi Penjual via WhatsApp
+              </a>
+            )}
+          </aside>
+        </div>
+
+        {/* ================== ULASAN: tanpa card, ala Etsy ================== */}
+        <section className="mt-12 border-t border-slate-200 pt-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl font-bold text-slate-900">
+                {averageRating.toFixed(1)}
+              </span>
+              <div>
+                <StarRating rating={averageRating} size={16} />
+                <p className="text-xs text-slate-500">dari {totalReviews} ulasan</p>
+              </div>
+            </div>
+
+            {/* Sort kecil */}
+            <div className="relative">
+              <button
+                onClick={() => setOpenSort(s => !s)}
+                className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs hover:bg-slate-50"
+              >
+                Sort by:{' '}
+                {sortKey === 'suggested'
+                  ? 'Suggested'
+                  : sortKey === 'recent'
+                  ? 'Most recent'
+                  : sortKey === 'highest'
+                  ? 'Highest Rating'
+                  : 'Lowest Rating'}
+                <ChevronDown size={14} />
+              </button>
+              {openSort && (
+                <div
+                  className="absolute right-0 mt-2 w-40 rounded-md border border-slate-200 bg-white shadow-md z-10"
+                  onMouseLeave={() => setOpenSort(false)}
+                >
+                  {([
+                    { key: 'suggested', label: 'Suggested' },
+                    { key: 'recent', label: 'Most recent' },
+                    { key: 'highest', label: 'Highest Rating' },
+                    { key: 'lowest', label: 'Lowest Rating' },
+                  ] as { key: SortKey; label: string }[]).map(o => (
+                    <button
+                      key={o.key}
+                      onClick={() => {
+                        setSortKey(o.key);
+                        setOpenSort(false);
+                      }}
+                      className={`block w-full px-3 py-2 text-left text-xs hover:bg-slate-50 ${
+                        sortKey === o.key ? 'font-semibold text-slate-900' : 'text-slate-700'
+                      }`}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
-        </div>
-        
-        <div className="mt-12 lg:mt-16 border-t border-slate-200 pt-10">
-          <h2 className="text-xl font-bold text-slate-800 mb-4 border-b border-slate-200 pb-2">
-            Ulasan & Rating
-          </h2>
-          
-          {totalReviews > 0 && (
-            <div className="flex items-center gap-3 mb-6 bg-white p-4 rounded-lg border shadow-sm">
-                <p className="text-4xl font-bold text-slate-800">{averageRating.toFixed(1)}</p>
-                <div>
-                    <StarRating rating={averageRating} size={20} />
-                    <p className="text-sm text-slate-500">dari {totalReviews} ulasan</p>
-                </div>
-            </div>
-          )}
 
-          {currentUser ? (
-            <div className="bg-white p-6 rounded-xl mb-8 border shadow-sm">
-              <h3 className="text-lg font-semibold mb-4 text-slate-800">Tulis Ulasan Anda</h3>
-              <form onSubmit={handleReviewSubmit}>
-                <div className="mb-4">
-                  <label className="block mb-2 text-sm font-medium text-slate-700">Rating Anda</label>
-                  <div className="flex space-x-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <motion.div key={star} whileHover={{ scale: 1.2 }} whileTap={{ scale: 0.9 }}>
-                        <Star className={`cursor-pointer transition-colors ${rating >= star ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 hover:text-yellow-300'}`} onClick={() => setRating(star)} />
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
-                <div className="mb-4">
-                  <label htmlFor="comment" className="block mb-2 text-sm font-medium text-slate-700">Komentar</label>
-                  <textarea id="comment" rows={4} className="w-full p-3 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-400 transition" value={comment} onChange={(e) => setComment(e.target.value)}></textarea>
-                </div>
-                <div className="flex items-center gap-4">
-                    <motion.button type="submit" className="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-sm hover:bg-blue-700 disabled:bg-blue-400 transition-all" disabled={loading} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                      {loading ? <><Loader2 className="animate-spin" size={18}/> Mengirim...</> : <><Send size={16}/> Kirim Ulasan</>}
-                    </motion.button>
-                    {message && <p className="text-red-500 text-sm">{message}</p>}
-                </div>
-              </form>
-            </div>
-          ) : (
-            <div className="bg-slate-100 text-slate-600 text-sm px-4 py-3 rounded-lg border border-slate-200 text-center mb-8">
-              <p><Link href="/login" className="text-blue-600 font-semibold hover:underline">Login</Link> untuk memberikan ulasan.</p>
-            </div>
-          )}
+          {/* Trigger form ulasan (tanpa “box” besar) */}
+          <div className="mt-5">
+            {currentUser ? (
+              <>
+                <button
+                  onClick={() => setShowForm(s => !s)}
+                  className="text-xs font-semibold text-blue-600 hover:underline"
+                >
+                  {showForm ? 'Tutup formulir' : 'Tulis ulasan'}
+                </button>
 
-          <div className="space-y-4">
-            {reviews.length > 0 ? (
-              reviews.map((review) => (
-                <motion.div key={review.id} className="bg-white rounded-lg shadow-sm p-4 border border-slate-200" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                  <div className="flex items-start">
-                    <UserCircle className="h-10 w-10 text-slate-400" />
-                    <div className="ml-4">
-                        <div className="flex items-center gap-3">
-                            <p className="font-semibold text-slate-800 text-sm">{review.userName}</p>
-                            <StarRating rating={review.rating} size={14} />
-                        </div>
-                        <p className="text-slate-600 text-sm mt-1">{review.comment}</p>
+                {showForm && (
+                  <form onSubmit={handleReviewSubmit} className="mt-3 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-600">Rating:</span>
+                      {[1, 2, 3, 4, 5].map(star => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setRating(star)}
+                          className="p-0.5"
+                          aria-label={`Rating ${star}`}
+                        >
+                          <Star
+                            size={16}
+                            className={
+                              rating >= star
+                                ? 'text-yellow-400 fill-yellow-400'
+                                : 'text-gray-300'
+                            }
+                          />
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      rows={3}
+                      value={comment}
+                      onChange={e => setComment(e.target.value)}
+                      placeholder="Tulis komentar Anda…"
+                      className="w-full border-b border-slate-300 bg-transparent p-1 text-sm outline-none focus:border-slate-500"
+                    />
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                      >
+                        {loading ? <Loader2 className="animate-spin" size={14} /> : <Send size={14} />}
+                        Kirim
+                      </button>
+                      {message && <span className="text-xs text-red-500">{message}</span>}
+                    </div>
+                  </form>
+                )}
+              </>
+            ) : (
+              <p className="text-xs text-slate-600">
+                <Link href="/login" className="font-semibold text-blue-600 hover:underline">
+                  Login
+                </Link>{' '}
+                untuk menulis ulasan.
+              </p>
+            )}
+          </div>
+
+          {/* Daftar ulasan: tanpa card, garis pemisah tipis */}
+          <div className="mt-6 divide-y divide-slate-200">
+            {sortedReviews.length ? (
+              sortedReviews.map(r => (
+                <div key={r.id} className="py-4">
+                  <div className="flex items-start gap-3">
+                    <UserCircle className="h-8 w-8 text-slate-400" />
+                    <div className="flex-1">
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="font-semibold text-slate-800">{r.userName}</span>
+                        <span className="text-slate-300">•</span>
+                        <StarRating rating={r.rating} size={12} />
+                        <span className="text-slate-300">•</span>
+                        <span className="text-slate-500">{formatDate(r.createdAt)}</span>
+                      </div>
+                      <p className="mt-2 text-sm text-slate-800">{r.comment}</p>
                     </div>
                   </div>
-                </motion.div>
+                </div>
               ))
-            ) : (<p className="text-slate-500 text-center py-8">Belum ada ulasan untuk produk ini.</p>)}
+            ) : (
+              <p className="py-10 text-center text-sm text-slate-500">
+                Belum ada ulasan untuk produk ini.
+              </p>
+            )}
+          </div>
+        </section>
+      </motion.div>
+
+      {/* === Sticky CTA WhatsApp (mobile only) === */}
+      {wa && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/70 md:hidden">
+          <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">Harga</p>
+              <p className="text-base font-bold text-slate-900">
+                Rp {product.price.toLocaleString('id-ID')}
+              </p>
+            </div>
+
+            <a
+              href={wa}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-green-700"
+              aria-label="Hubungi penjual via WhatsApp"
+            >
+              <MessageSquare size={16} />
+              <span className="ml-2">Hubungi Penjual</span>
+            </a>
           </div>
         </div>
-      </motion.div>
+      )}
     </div>
   );
 };
 
+/* ================== SSG ================== */
 export const getStaticPaths: GetStaticPaths = async () => {
-    try {
-        const productsSnapshot = await db.collection('products').get();
-        const paths = productsSnapshot.docs.map(doc => ({ params: { id: doc.id } }));
-        return { paths, fallback: 'blocking' };
-    } catch (error) {
-        return { paths: [], fallback: 'blocking' };
-    }
+  try {
+    const snap = await db.collection('products').get();
+    const paths = snap.docs.map(doc => ({ params: { id: doc.id } }));
+    return { paths, fallback: 'blocking' };
+  } catch {
+    return { paths: [], fallback: 'blocking' };
+  }
 };
 
-export const getStaticProps: GetStaticProps = async (context) => {
-    const { id } = context.params as { id: string };
-    try {
-        const productDoc = await db.collection('products').doc(id).get();
-        if (!productDoc.exists) return { notFound: true };
-        
-        const productData = productDoc.data()!;
-        
-        // Mengambil data penjual untuk mendapatkan nomor WhatsApp
-        const sellerDoc = await db.collection('users').doc(productData.ownerId).get();
-        
-        const product: Product = {
-          id: productDoc.id,
-          name: productData.name,
-          price: productData.price,
-          description: productData.description,
-          shopName: productData.shopName,
-          imageUrl: productData.imageUrl,
-          ownerId: productData.ownerId,
-        };
-        
-        const seller: Seller = {
-          whatsapp: sellerDoc.exists ? sellerDoc.data()!.whatsapp : '',
-        };
+export const getStaticProps: GetStaticProps = async ctx => {
+  const { id } = ctx.params as { id: string };
+  try {
+    const productDoc = await db.collection('products').doc(id).get();
+    if (!productDoc.exists) return { notFound: true };
 
-        const reviewsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reviews?productId=${product.id}`);
-        const initialReviews: Review[] = reviewsRes.ok ? await reviewsRes.json() : [];
-        
-        return {
-          props: {
-            product: JSON.parse(JSON.stringify(product)),
-            initialReviews: initialReviews.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)),
-            seller,
-          },
-          revalidate: 10,
-        };
-    } catch (error) {
-        return { notFound: true };
-    }
+    const productData = productDoc.data()!;
+    const sellerDoc = await db.collection('users').doc(productData.ownerId).get();
+
+    const product: Product = {
+      id: productDoc.id,
+      name: productData.name,
+      price: productData.price,
+      description: productData.description,
+      shopName: productData.shopName,
+      imageUrl: productData.imageUrl,
+      ownerId: productData.ownerId,
+      category: productData.category || '',
+    };
+
+    const seller: Seller = {
+      whatsapp: (sellerDoc.exists && sellerDoc.data()?.whatsapp) || '',
+    };
+
+    const reviewsRes = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/reviews?productId=${product.id}`,
+    );
+    const initialReviews: Review[] = reviewsRes.ok ? await reviewsRes.json() : [];
+
+    return {
+      props: {
+        product: JSON.parse(JSON.stringify(product)),
+        initialReviews: initialReviews.sort(
+          (a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0),
+        ),
+        seller,
+      },
+      revalidate: 10,
+    };
+  } catch {
+    return { notFound: true };
+  }
 };
 
 export default ProductDetailPage;

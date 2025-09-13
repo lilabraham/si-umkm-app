@@ -1,16 +1,16 @@
 // LOKASI FILE: src/components/ui/TokoCard.tsx
 
+import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ShoppingBag, Image as ImageIcon } from 'lucide-react';
 
-// Tipe data untuk Toko
 interface Toko {
   id: string;
   name: string;
   imageUrl: string;
-  productCount: number;
+  productCount: number; // kalau API belum kirim, kita guard di bawah
 }
 
 interface TokoCardProps {
@@ -19,36 +19,59 @@ interface TokoCardProps {
 }
 
 const TokoCard = ({ toko, variants }: TokoCardProps) => {
+  const [imgError, setImgError] = useState(false);
+  const hasImage = !!toko.imageUrl && !imgError;
+
+  // Guard supaya selalu ada angka yang ditampilkan
+  const count =
+    typeof toko.productCount === 'number' && !Number.isNaN(toko.productCount)
+      ? toko.productCount
+      : 0;
+
   return (
     <motion.div variants={variants} className="h-full">
-      <Link href={`/toko/${toko.id}`} className="block group bg-white rounded-xl shadow-md border border-gray-200 hover:shadow-lg hover:border-blue-500 transition-all duration-300 h-full flex flex-col">
-        
-        <div className="relative overflow-hidden rounded-t-xl aspect-w-16 aspect-h-9">
-          {toko.imageUrl ? (
+      <Link
+        href={`/toko/${toko.id}`}
+        className="group block h-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md hover:border-blue-500"
+        aria-label={`Lihat toko ${toko.name}`}
+      >
+        {/* Gambar/banner toko */}
+        <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-100">
+          {hasImage ? (
             <Image
-              src={toko.imageUrl} // Membaca properti imageUrl
-              alt={`Gambar untuk ${toko.name}`}
+              src={toko.imageUrl}
+              alt={`Gambar toko ${toko.name}`}
               fill
-              className="object-cover w-full h-full transition-transform duration-300 ease-in-out group-hover:scale-105"
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              sizes="(max-width: 640px) 100vw, (max-width:1024px) 50vw, 33vw"
+              className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
+              onError={() => setImgError(true)}
+              priority={false}
             />
           ) : (
-            <div className="w-full h-full bg-slate-100 flex items-center justify-center">
-              <ImageIcon className="w-12 h-12 text-slate-300" />
+            <div className="flex h-full w-full items-center justify-center">
+              <ImageIcon className="h-10 w-10 text-slate-300" />
             </div>
           )}
         </div>
 
-        <div className="p-5 flex-grow flex flex-col">
-          <h3 className="text-lg font-bold text-slate-800 transition-colors group-hover:text-blue-600 flex-grow">
+        {/* Konten */}
+        <div className="p-5">
+          {/* Judul tanpa flex-1 supaya bar bawah tidak ketarik/hilang */}
+          <h3 className="line-clamp-1 text-lg font-bold text-slate-800 transition-colors group-hover:text-blue-600">
             {toko.name}
           </h3>
-          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
-            <div className="flex items-center gap-1.5">
-              <ShoppingBag size={14} />
-              <span>{toko.productCount} Produk</span>
+
+          {/* Bar bawah selalu tampil */}
+          <div className="mt-3 border-t border-slate-100 pt-3 text-sm">
+            <div className="flex items-center justify-between text-slate-600">
+              <span className="inline-flex items-center gap-1.5">
+                <ShoppingBag size={14} />
+                <span>{count} Produk</span>
+              </span>
+              <span className="font-semibold text-blue-600 group-hover:underline">
+                Lihat Toko →
+              </span>
             </div>
-            <span className="font-semibold text-blue-600 group-hover:underline">Lihat Toko →</span>
           </div>
         </div>
       </Link>

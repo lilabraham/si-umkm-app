@@ -114,7 +114,7 @@ const HomePage: NextPage<HomePageProps> = ({ products }) => {
             />
           </div>
         </div>
-        <a href="/produk" className="inline-flex items-center justify-center rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 shadow-lg shadow-green-500/20 transition">
+        <a href="/produk/produk" className="inline-flex items-center justify-center rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 shadow-lg shadow-green-500/20 transition">
           Belanja Sekarang
         </a>
       </div>

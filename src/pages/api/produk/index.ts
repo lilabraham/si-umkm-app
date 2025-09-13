@@ -1,88 +1,63 @@
 // LOKASI FILE: src/pages/api/produk/index.ts
-
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { db } from '@/lib/firebaseAdmin'; // DIUBAH: Menggunakan db dari Admin SDK
-import type { Query } from 'firebase-admin/firestore';
-import { sanitizeInput } from '@/lib/sanitize';
+import { db } from '@/lib/firebaseAdmin';
 
-// DIUBAH: Interface disesuaikan agar konsisten
-export interface Product {
+type Product = {
   id: string;
   name: string;
   price: number;
-  description: string;
-  shopId: string; // Kunci penting untuk filter
-  shopName: string;
-  imageUrl: string;
+  description?: string;
+  imageUrl?: string;
+  shopName?: string;
   ownerId: string;
-}
+  category?: string;
+  rating?: number;
+  createdAt?: { seconds: number; nanoseconds: number } | null;
+};
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET') {
+    res.setHeader('Allow', 'GET');
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
 
-  switch (req.method) {
-    case 'GET':
-      try {
-        // BARU: Logika untuk filter berdasarkan ID Toko
-        const { tokoId } = req.query;
-        
-        let productsQuery: Query = db.collection('products');
+  try {
+    const { tokoId, kategori, q } = req.query as {
+      tokoId?: string;
+      kategori?: string;
+      q?: string;
+    };
 
-        if (tokoId && typeof tokoId === 'string') {
-          // Menambahkan filter jika tokoId diberikan
-          productsQuery = productsQuery.where('shopId', '==', tokoId);
-        }
-        
-        const querySnapshot = await productsQuery.get();
-        
-        const products = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Product[];
-        
-        res.status(200).json(products);
+    let ref: FirebaseFirestore.Query = db.collection('products');
 
-      } catch (error) {
-        console.error("Error fetching products:", error);
-        res.status(500).json({ message: 'Gagal mengambil data produk', error });
-      }
-      break;
+    if (tokoId) {
+      ref = ref.where('ownerId', '==', tokoId);
+    }
+    if (kategori) {
+      ref = ref.where('category', '==', kategori);
+    }
 
-    case 'POST':
-      try {
-        // DIUBAH: Menambahkan shopId ke dalam data yang diterima
-        const { name, price, description, ownerId, shopName, shopId, imageUrl } = req.body;
-        
-        if (!name || !price || !description || !ownerId || !shopName || !shopId) {
-          return res.status(400).json({ message: 'Data tidak lengkap.' });
-        }
+    // ⛔️ JANGAN orderBy di sini agar tidak perlu index komposit
+    // // ref = ref.orderBy('createdAt', 'desc');
 
-        const sanitizedProductData = {
-          name: sanitizeInput(name),
-          price: Number(price),
-          description: sanitizeInput(description),
-          ownerId: ownerId,
-          shopName: sanitizeInput(shopName),
-          shopId: shopId, // shopId juga disimpan
-          imageUrl: imageUrl,
-          createdAt: new Date(), // Menambahkan timestamp
-        };
+    const snap = await ref.get();
+    let items: Product[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
 
-        // DIUBAH: Menggunakan metode .add() dari Admin SDK
-        const docRef = await db.collection('products').add(sanitizedProductData);
-        
-        res.status(201).json({ id: docRef.id, ...sanitizedProductData });
+    // Filter q (fallback sederhana)
+    if (q && q.trim()) {
+      const s = q.trim().toLowerCase();
+      items = items.filter((p) => p.name?.toLowerCase().includes(s));
+    }
 
-      } catch (error) {
-        console.error("Error saving product:", error);
-        res.status(500).json({ message: 'Gagal menyimpan data ke Firestore', error });
-      }
-      break;
+    // ✅ Urutkan di memori berdasarkan createdAt desc jika ada
+    items.sort(
+      (a, b) =>
+        (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)
+    );
 
-    default:
-      res.setHeader('Allow', ['GET', 'POST']);
-      res.status(405).end(`Metode ${req.method} Tidak Diizinkan`);
+    return res.status(200).json(items);
+  } catch (e: any) {
+    console.error('[GET /api/produk] Error:', e);
+    return res.status(500).json({ error: 'Failed to fetch products' });
   }
 }
