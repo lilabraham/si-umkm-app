@@ -1,4 +1,3 @@
-// LOKASI FILE: src/pages/admin/moderasi.tsx
 import type { GetServerSideProps, NextPage } from 'next';
 import { useEffect, useMemo, useState, FormEvent } from 'react';
 import { motion } from 'framer-motion';
@@ -58,11 +57,10 @@ const ModerasiPage: NextPage = () => {
     try {
       const token = await currentUser?.getIdToken();
 
-      // Map status UI → status API
       // UI: pending | resolved | all
-      // API: pending | approved | hidden | all
+      // API moderasi kita dukung pending | resolved | all
       const apiStatus =
-        status === 'pending' ? 'pending' : status === 'resolved' ? 'approved' : 'all';
+        status === 'pending' ? 'pending' : status === 'resolved' ? 'resolved' : 'all';
 
       // Saat ini hanya produk (kalau "Semua" tetap kirim product agar ada data)
       const apiType = type === 'product' ? 'product' : 'product';
@@ -277,7 +275,10 @@ const ModerasiPage: NextPage = () => {
                 <th className="px-4 py-3">
                   <input
                     type="checkbox"
-                    onChange={(e) => toggleAll(e.currentTarget.checked)}
+                    onChange={(e) => {
+                      const checked = (e.target as HTMLInputElement | null)?.checked ?? false;
+                      toggleAll(checked);
+                    }}
                     aria-label="Pilih semua"
                   />
                 </th>
@@ -296,9 +297,10 @@ const ModerasiPage: NextPage = () => {
                       <input
                         type="checkbox"
                         checked={!!selected[r.id]}
-                        onChange={(e) =>
-                          setSelected((s) => ({ ...s, [r.id]: e.currentTarget.checked }))
-                        }
+                        onChange={(e) => {
+                          const checked = (e.target as HTMLInputElement | null)?.checked ?? false;
+                          setSelected((s) => ({ ...s, [r.id]: checked }));
+                        }}
                         aria-label={`Pilih report ${r.id}`}
                       />
                     </td>

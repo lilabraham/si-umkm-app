@@ -13,7 +13,9 @@ interface Toko {
   id: string;
   name: string;
   imageUrl: string;
-  productCount: number;
+  productCount: number;             // jumlah produk PUBLIC yang tampil
+  // boleh ada, tapi TIDAK dikirim undefined
+  publicProductCount?: number;      // hanya ditambahkan kalau memang number
 }
 
 interface TokoPageProps {
@@ -26,8 +28,11 @@ interface TokoPageProps {
  * - { items: [...] }
  * - { shops: [...] }
  * - { data: [...] }
- * dan memetakan field ke { id, name, imageUrl, productCount }
- * (id fallback ke uid).
+ * Memetakan ke { id, name, imageUrl, productCount }
+ *
+ * Perbaikan:
+ * - productCount = productCount ?? publicProductCount ?? productsCount ?? 0
+ * - TIDAK mengisi properti dengan undefined (di-skip)
  */
 function normalizeTokoResponse(json: any): Toko[] {
   const src = Array.isArray(json)
@@ -42,13 +47,31 @@ function normalizeTokoResponse(json: any): Toko[] {
 
   if (!Array.isArray(src)) return [];
 
-  return src.map((s: any) => ({
-    id: String(s?.id ?? s?.uid ?? ''),
-    name: String(s?.shopName ?? s?.displayName ?? s?.name ?? 'Toko'),
-    imageUrl: String(s?.shopImageUrl ?? s?.imageUrl ?? ''),
-    productCount:
-      typeof s?.productCount === 'number' ? s.productCount : 0,
-  })) as Toko[];
+  return src.map((s: any) => {
+    // tentukan count secara aman
+    let count = 0;
+    if (typeof s?.productCount === 'number') {
+      count = s.productCount;
+    } else if (typeof s?.publicProductCount === 'number') {
+      count = s.publicProductCount;
+    } else if (typeof s?.productsCount === 'number') {
+      count = s.productsCount;
+    }
+
+    const obj: Toko = {
+      id: String(s?.id ?? s?.uid ?? ''),
+      name: String(s?.shopName ?? s?.displayName ?? s?.name ?? 'Toko'),
+      imageUrl: String(s?.shopImageUrl ?? s?.imageUrl ?? ''),
+      productCount: count,
+    };
+
+    // hanya tambahkan publicProductCount jika benar-benar number
+    if (typeof s?.publicProductCount === 'number') {
+      obj.publicProductCount = s.publicProductCount;
+    }
+
+    return obj;
+  });
 }
 
 const TokoPage: NextPage<TokoPageProps> = ({ initialToko = [] }) => {
@@ -152,6 +175,7 @@ const TokoPage: NextPage<TokoPageProps> = ({ initialToko = [] }) => {
 export const getStaticProps: GetStaticProps = async () => {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+    // SSG + ISR; angka akan menyusul saat revalidate interval
     const res = await fetch(`${apiUrl}/api/toko`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`Failed to fetch toko: ${res.status} ${res.statusText}`);
     const raw = await res.json();
@@ -160,11 +184,11 @@ export const getStaticProps: GetStaticProps = async () => {
 
     return {
       props: { initialToko: toko },
-      revalidate: 60, // ISR
+      revalidate: 10, // perpendek supaya angka cepat ikut perubahan
     };
   } catch (error) {
     console.error('Gagal mengambil data toko saat build:', error);
-    return { props: { initialToko: [] }, revalidate: 60 };
+    return { props: { initialToko: [] }, revalidate: 10 };
   }
 };
 

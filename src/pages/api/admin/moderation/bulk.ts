@@ -1,9 +1,16 @@
-// LOKASI: src/pages/api/admin/moderation/bulk.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuth, getFirestore } from '@/lib/firebaseAdmin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 type BulkAction = 'approve' | 'hide' | 'delete';
-type ItemType = 'product';
+
+function getToken(req: NextApiRequest): string | null {
+  const h = req.headers.authorization;
+  if (h?.startsWith('Bearer ')) return h.substring(7);
+  // @ts-ignore
+  const cookie = req.cookies?.token || null;
+  return cookie || null;
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -11,89 +18,135 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).end('Method Not Allowed');
   }
 
-  try {
-    // ===== auth admin =====
-    const authHeader = req.headers.authorization || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-    const adminAuth = getAuth();
-    const decoded = await adminAuth.verifyIdToken(token);
-    const db = getFirestore();
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
 
+  try {
+    const token = getToken(req);
+    if (!token) return res.status(401).json({ error: 'Unauthorized: missing token' });
+
+    const auth = getAuth();
+    const decoded = await auth.verifyIdToken(token);
+
+    const db = getFirestore();
     const userDoc = await db.collection('users').doc(decoded.uid).get();
     if (userDoc.data()?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
 
-    // ===== payload =====
     const { action, type, reportIds } = req.body as {
       action: BulkAction;
-      type: ItemType;
+      type: 'product';
       reportIds: string[];
     };
 
-    if (!action || !type || !Array.isArray(reportIds) || reportIds.length === 0) {
-      return res.status(400).json({ error: 'Invalid payload' });
+    if (type !== 'product') return res.status(400).json({ error: 'Unsupported type' });
+    if (!Array.isArray(reportIds) || reportIds.length === 0) {
+      return res.status(400).json({ error: 'Empty reportIds' });
     }
-    if (type !== 'product') {
-      return res.status(400).json({ error: 'Unsupported type' });
+    if (!['approve', 'hide', 'delete'].includes(action)) {
+      return res.status(400).json({ error: 'Invalid action' });
     }
 
-    // Ambil report -> map ke produk
-    const reportSnaps = await Promise.all(
+    const rDocs = await Promise.all(
       reportIds.map((id) => db.collection('reports').doc(id).get())
     );
-    const validReports = reportSnaps.filter((d) => d.exists);
-    const productIds = validReports.map((d) => (d.data() as any).itemId as string);
 
     const batch = db.batch();
+    let processed = 0;
 
-    for (let i = 0; i < validReports.length; i++) {
-      const rDoc = validReports[i];
-      const rRef = db.collection('reports').doc(rDoc.id);
-      const productId = (rDoc.data() as any).itemId as string;
-      const pRef = db.collection('products').doc(productId);
+    for (const rDoc of rDocs) {
+      if (!rDoc.exists) continue;
+      const r = rDoc.data() as any;
 
-      if (action === 'approve') {
-        batch.update(rRef, {
-          status: 'approved',
-          resolvedAt: new Date(),
-          resolvedBy: decoded.uid,
-        });
-        batch.update(pRef, {
-          visible: true,
-          isDeleted: false,
-        });
-      } else if (action === 'hide') {
-        batch.update(rRef, {
-          status: 'hidden',
-          resolvedAt: new Date(),
-          resolvedBy: decoded.uid,
-        });
-        batch.update(pRef, {
-          visible: false,
-        });
-      } else if (action === 'delete') {
-        // soft delete lebih aman; jika ingin hard delete, ganti jadi batch.delete(pRef)
-        batch.update(rRef, {
-          status: 'hidden',
-          resolvedAt: new Date(),
-          resolvedBy: decoded.uid,
-          note: 'auto-hidden because product deleted',
-        });
-        batch.update(pRef, {
-          isDeleted: true,
-          visible: false,
-          deletedAt: new Date(),
-          deletedBy: decoded.uid,
-        });
+      const productId = String(
+        r?.targetId ?? r?.itemId ?? r?.productId ?? r?.product?.productId ?? ''
+      ).trim();
+
+      // siapkan info produk
+      let ownerId: string | null = null;
+      let wasPublic = false;
+      const pDoc = productId ? await db.collection('products').doc(productId).get() : null;
+      if (pDoc?.exists) {
+        const p = pDoc.data() as any;
+        ownerId = String(p?.ownerId || '');
+        wasPublic = !(p?.visibility === 'hidden' || p?.visible === false);
       }
+
+      // === aksi ke produk
+      if (productId && pDoc?.exists) {
+        const pRef = db.collection('products').doc(productId);
+        if (action === 'approve') {
+          if (!wasPublic) batch.update(pRef, { visibility: 'public' });
+        } else if (action === 'hide') {
+          if (wasPublic) batch.update(pRef, { visibility: 'hidden' });
+        } else if (action === 'delete') {
+          batch.delete(pRef);
+        }
+      }
+
+      // === resolve report
+      batch.update(db.collection('reports').doc(rDoc.id), {
+        status: 'resolved',
+        resolution: action,
+        resolvedAt: FieldValue.serverTimestamp(),
+        resolvedBy: decoded.uid,
+      });
+
+      // === admin log
+      batch.set(db.collection('admin_logs').doc(), {
+        type: 'report_resolve',
+        action,
+        reportId: rDoc.id,
+        targetType: 'product',
+        targetId: productId || null,
+        by: decoded.uid,
+        at: FieldValue.serverTimestamp(),
+      });
+
+      // === counter users
+      if (ownerId) {
+        const uRef = db.collection('users').doc(ownerId);
+
+        if (action === 'approve') {
+          // hidden -> public
+          if (!wasPublic) {
+            batch.set(
+              uRef,
+              {
+                publicProductCount: FieldValue.increment(1),
+                productCount: FieldValue.increment(1), // agar UI lama yang pakai productCount ikut benar
+              },
+              { merge: true }
+            );
+          }
+        } else if (action === 'hide') {
+          // public -> hidden
+          if (wasPublic) {
+            batch.set(
+              uRef,
+              {
+                publicProductCount: FieldValue.increment(-1),
+                productCount: FieldValue.increment(-1),
+              },
+              { merge: true }
+            );
+          }
+        } else if (action === 'delete') {
+          // delete: total -1; jika sebelumnya public → publicCount & productCount -1
+          const data: any = { totalProductCount: FieldValue.increment(-1) };
+          if (wasPublic) {
+            data.publicProductCount = FieldValue.increment(-1);
+            data.productCount = FieldValue.increment(-1);
+          }
+          batch.set(uRef, data, { merge: true });
+        }
+      }
+
+      processed++;
     }
 
     await batch.commit();
-
-    return res.status(200).json({
-      ok: true,
-      processed: validReports.length,
-      productIds,
-    });
+    return res.status(200).json({ processed });
   } catch (e: any) {
     console.error('[moderation:bulk] error', e);
     return res.status(500).json({ error: 'Internal Server Error' });

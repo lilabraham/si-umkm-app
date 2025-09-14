@@ -8,6 +8,7 @@ import { useState, FormEvent, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import Breadcrumb from '@/components/common/Breadcrumb';
 import { Star, MessageSquare, Send, UserCircle, Tag, ChevronDown, Loader2 } from 'lucide-react';
+import { reportProduct } from '@/lib/report';
 
 interface Product {
   id: string;
@@ -185,7 +186,7 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({
       </div>
     );
   }
-
+  
   // guard report (hanya pembeli non-owner, non-admin)
   const canReport =
     !!currentUser &&
