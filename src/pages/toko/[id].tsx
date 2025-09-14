@@ -36,38 +36,40 @@ interface TokoDetailPageProps {
 /* ===== Page ===== */
 const TokoDetailPage: NextPage<TokoDetailPageProps> = ({ toko, products }) => {
   const router = useRouter();
+
+  // Skeleton saat fallback blocking sedang generate
   if (router.isFallback) {
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { staggerChildren: 0.07 } },
-  };
-  const cardVariants = { hidden: { y: 16, opacity: 0 }, visible: { y: 0, opacity: 1 } };
+    const containerVariants = {
+      hidden: { opacity: 0 },
+      visible: { opacity: 1, transition: { staggerChildren: 0.07 } },
+    };
+    const cardVariants = { hidden: { y: 16, opacity: 0 }, visible: { y: 0, opacity: 1 } };
 
-  return (
-    <div className="bg-slate-50 min-h-screen">
-      <div className="container mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-10">
-        {/* judul placeholder */}
-        <div className="mb-6 h-7 w-56 rounded bg-slate-200 animate-pulse" />
-        <div className="mb-8 h-4 w-80 rounded bg-slate-200 animate-pulse" />
+    return (
+      <div className="bg-slate-50 min-h-screen">
+        <div className="container mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-10">
+          {/* judul placeholder */}
+          <div className="mb-6 h-7 w-56 rounded bg-slate-200 animate-pulse" />
+          <div className="mb-8 h-4 w-80 rounded bg-slate-200 animate-pulse" />
 
-        {/* search bar placeholder */}
-        <div className="mb-10 h-10 w-full md:w-[720px] rounded-full bg-slate-200 animate-pulse" />
+          {/* search bar placeholder */}
+          <div className="mb-10 h-10 w-full md:w-[720px] rounded-full bg-slate-200 animate-pulse" />
 
-        {/* grid skeleton */}
-        <motion.div
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          {Array.from({ length: 8 }).map((_, i) => (
-            <SkeletonProductCard key={i} variants={cardVariants} />
-          ))}
-        </motion.div>
+          {/* grid skeleton */}
+          <motion.div
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            {Array.from({ length: 8 }).map((_, i) => (
+              <SkeletonProductCard key={i} variants={cardVariants} />
+            ))}
+          </motion.div>
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
   if (!toko) return <div className="text-center py-20">Toko tidak ditemukan.</div>;
 
@@ -119,12 +121,12 @@ const TokoDetailPage: NextPage<TokoDetailPageProps> = ({ toko, products }) => {
 
       <div className="container mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-10">
         <Breadcrumb
-        items={[
-          { label: 'Beranda', href: '/' },
-          { label: 'UMKM', href: '/produk/produk' },
-          { label: toko.name }, // halaman aktif
-        ]}
-      />
+          items={[
+            { label: 'Beranda', href: '/' },
+            { label: 'UMKM', href: '/produk/produk' },
+            { label: toko.name }, // halaman aktif
+          ]}
+        />
 
         {/* Header */}
         <header className="text-center mb-8">
@@ -216,47 +218,93 @@ const TokoDetailPage: NextPage<TokoDetailPageProps> = ({ toko, products }) => {
 
 /* ===== Static generation ===== */
 export const getStaticPaths: GetStaticPaths = async () => {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-  const res = await fetch(`${apiUrl}/api/toko`);
-  const allToko: Toko[] = await res.json();
-  const paths = allToko.map((t) => ({ params: { id: t.id } }));
-  return { paths, fallback: 'blocking' };
+  try {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+    const res = await fetch(`${apiUrl}/api/toko`);
+    const data = res.ok ? await res.json() : [];
+
+    // Normalisasi: dukung berbagai bentuk (array / {items} / {shops} / {data})
+    const shops: any[] = Array.isArray(data)
+      ? data
+      : Array.isArray((data as any).items)
+      ? (data as any).items
+      : Array.isArray((data as any).shops)
+      ? (data as any).shops
+      : Array.isArray((data as any).data)
+      ? (data as any).data
+      : [];
+
+    const paths = shops
+      .filter((s) => s && (s.uid || s.id))
+      .map((s) => ({ params: { id: String(s.uid || s.id) } }));
+
+    return { paths, fallback: 'blocking' };
+  } catch {
+    return { paths: [], fallback: 'blocking' };
+  }
 };
 
 export const getStaticProps: GetStaticProps = async ({ params }) => {
   const tokoId = params?.id as string;
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
   try {
-    const [tokoRes, productsRes] = await Promise.all([
-      fetch(`${apiUrl}/api/toko/${tokoId}`),
-      fetch(`${apiUrl}/api/produk?tokoId=${tokoId}`),
-    ]);
+    // Server-only: ambil langsung dari Firestore Admin (stabil, tidak butuh token)
+    const { getFirestore } = await import('@/lib/firebaseAdmin');
+    const db = getFirestore();
 
-    if (!tokoRes.ok) {
-      return { notFound: true };
-    }
+    // Detail toko
+    const tokoDoc = await db.collection('users').doc(tokoId).get();
+    if (!tokoDoc.exists) return { notFound: true };
 
-    const toko = await tokoRes.json();
+    const u = tokoDoc.data() || {};
+    const toko: Toko = {
+      id: tokoDoc.id,
+      name: u.shopName || u.displayName || 'Toko',
+      imageUrl: u.shopImageUrl || u.photoURL || '',
+      description: u.description || '',
+    };
 
-    // 🔒 Pastikan selalu array
-    let productsJson: any = [];
-    try {
-      productsJson = await productsRes.json();
-    } catch {
-      productsJson = [];
-    }
-    const products: any[] = Array.isArray(productsJson) ? productsJson : [];
+    // Daftar produk milik toko
+    const prodSnap = await db.collection('products').where('ownerId', '==', tokoId).get();
+    const products: Product[] = prodSnap.docs
+      .map((d) => {
+        const p = d.data() as any;
+        return {
+          id: d.id,
+          name: p.name || '',
+          price: p.price || 0,
+          description: p.description || '',
+          imageUrl: p.imageUrl || '',
+          shopName: p.shopName || toko.name,
+          ownerId: p.ownerId || tokoId,
+          category: p.category || '',
+          visibility: p.visibility || 'public',
+          createdAt: p.createdAt?.seconds
+            ? { seconds: p.createdAt.seconds, nanoseconds: p.createdAt.nanoseconds }
+            : null,
+        };
+      })
+      // jika kamu pakai visibility, tampilkan yang bukan hidden
+      .filter((p: any) => p.visibility !== 'hidden')
+      // mapping ke tipe Product di atas (buang field ekstra)
+      .map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        shopName: p.shopName,
+        imageUrl: p.imageUrl,
+        category: p.category || '',
+      }));
 
     return {
       props: {
         toko,
         products,
       },
-      revalidate: 60,
+      revalidate: 60, // ISR
     };
-  } catch (error) {
-    console.error(`Gagal mengambil data untuk toko ${tokoId}:`, error);
+  } catch (e) {
+    console.error('[toko/[id]] getStaticProps error:', e);
     return { notFound: true };
   }
 };

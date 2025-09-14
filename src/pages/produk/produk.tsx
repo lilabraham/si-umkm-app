@@ -8,16 +8,47 @@ import { Search, Store } from 'lucide-react';
 import TokoCard from '@/components/ui/TokoCard';
 import SkeletonTokoCard from '@/components/ui/SkeletonTokoCard';
 
-// Interface data dari API /api/toko
+// ==== Bentuk data yang dipakai komponen card ====
 interface Toko {
   id: string;
   name: string;
-  imageUrl: string;     // foto profil toko (boleh kosong => fallback di kartu)
-  productCount: number; // jumlah produk toko
+  imageUrl: string;
+  productCount: number;
 }
 
 interface TokoPageProps {
   initialToko: Toko[];
+}
+
+/** ========= Normalizer =========
+ * Menerima berbagai bentuk respons:
+ * - array langsung
+ * - { items: [...] }
+ * - { shops: [...] }
+ * - { data: [...] }
+ * dan memetakan field ke { id, name, imageUrl, productCount }
+ * (id fallback ke uid).
+ */
+function normalizeTokoResponse(json: any): Toko[] {
+  const src = Array.isArray(json)
+    ? json
+    : Array.isArray(json?.items)
+    ? json.items
+    : Array.isArray(json?.shops)
+    ? json.shops
+    : Array.isArray(json?.data)
+    ? json.data
+    : [];
+
+  if (!Array.isArray(src)) return [];
+
+  return src.map((s: any) => ({
+    id: String(s?.id ?? s?.uid ?? ''),
+    name: String(s?.shopName ?? s?.displayName ?? s?.name ?? 'Toko'),
+    imageUrl: String(s?.shopImageUrl ?? s?.imageUrl ?? ''),
+    productCount:
+      typeof s?.productCount === 'number' ? s.productCount : 0,
+  })) as Toko[];
 }
 
 const TokoPage: NextPage<TokoPageProps> = ({ initialToko = [] }) => {
@@ -121,9 +152,11 @@ const TokoPage: NextPage<TokoPageProps> = ({ initialToko = [] }) => {
 export const getStaticProps: GetStaticProps = async () => {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-    const res = await fetch(`${apiUrl}/api/toko`);
-    if (!res.ok) throw new Error(`Failed to fetch toko: ${res.statusText}`);
-    const toko: Toko[] = await res.json();
+    const res = await fetch(`${apiUrl}/api/toko`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`Failed to fetch toko: ${res.status} ${res.statusText}`);
+    const raw = await res.json();
+
+    const toko: Toko[] = normalizeTokoResponse(raw);
 
     return {
       props: { initialToko: toko },

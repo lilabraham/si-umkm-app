@@ -1,8 +1,13 @@
 // LOKASI FILE: src/pages/api/admin/manage-user.ts
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { admin, db } from '@/lib/firebaseAdmin'; // Menggunakan Firebase Admin
-import type { UserRole } from '@/context/AuthContext';
+import { getAuth, getFirestore } from '@/lib/firebaseAdmin';
+
+// Tipe role lokal agar tidak mengimpor dari file client
+type UserRole = 'admin' | 'penjual' | 'pembeli';
+
+const auth = getAuth();
+const db = getFirestore();
 
 // Tipe data untuk request body
 interface RequestBody {
@@ -26,8 +31,10 @@ export default async function handler(
     if (!token) {
       return res.status(401).json({ error: 'Tidak terautentikasi.' });
     }
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    
+
+    // ✅ gunakan Admin SDK via helper getAuth()
+    const decodedToken = await auth.verifyIdToken(token);
+
     // 3. Cek apakah pengguna yang melakukan permintaan adalah admin
     const adminDoc = await db.collection('users').doc(decodedToken.uid).get();
     if (adminDoc.data()?.role !== 'admin') {
@@ -41,24 +48,25 @@ export default async function handler(
     }
 
     const userDocRef = db.collection('users').doc(targetUserId);
-    
+
     // Tentukan peran baru berdasarkan aksi
     let newRole: UserRole | 'rejected_penjual' = 'pembeli'; // Default
     if (action === 'approve') {
       newRole = 'penjual';
     } else if (action === 'reject') {
-      newRole = 'rejected_penjual'; // Kita beri status 'ditolak'
+      newRole = 'rejected_penjual'; // status 'ditolak'
     } else {
       return res.status(400).json({ error: 'Aksi tidak valid.' });
     }
-    
+
     // 5. Update peran pengguna di Firestore
     await userDocRef.update({ role: newRole });
 
-    res.status(200).json({ message: `Pengguna ${targetUserId} berhasil di-${action}. Peran baru: ${newRole}` });
-
+    return res
+      .status(200)
+      .json({ message: `Pengguna ${targetUserId} berhasil di-${action}. Peran baru: ${newRole}` });
   } catch (error) {
-    console.error("Error managing user:", error);
-    res.status(500).json({ error: 'Terjadi kesalahan di server.' });
+    console.error('Error managing user:', error);
+    return res.status(500).json({ error: 'Terjadi kesalahan di server.' });
   }
 }

@@ -1,5 +1,6 @@
 // LOKASI FILE: src/pages/produk/[id].tsx
 
+// src/pages/produk/[id].tsx
 import { GetStaticPaths, GetStaticProps, NextPage } from 'next';
 import Head from 'next/head';
 import Image from 'next/image';
@@ -7,19 +8,9 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useState, FormEvent, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { db } from '@/lib/firebaseAdmin';
 import Breadcrumb from '@/components/common/Breadcrumb';
-import {
-  Star,
-  MessageSquare,
-  Send,
-  UserCircle,
-  Tag,
-  ChevronDown,
-  Loader2,
-} from 'lucide-react';
+import { Star, MessageSquare, Send, UserCircle, Tag, ChevronDown, Loader2 } from 'lucide-react';
 
-/* ================== Types ================== */
 interface Product {
   id: string;
   name: string;
@@ -46,15 +37,10 @@ interface ProductDetailPageProps {
   seller: Seller | null;
 }
 
-/* ================== Helpers ================== */
 const StarRating = ({ rating, size = 14 }: { rating: number; size?: number }) => (
   <div className="flex items-center">
     {[...Array(5)].map((_, i) => (
-      <Star
-        key={i}
-        size={size}
-        className={i < Math.round(rating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}
-      />
+      <Star key={i} size={size} className={i < Math.round(rating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'} />
     ))}
   </div>
 );
@@ -67,22 +53,14 @@ const formatDate = (ts: Review['createdAt']) => {
 
 type SortKey = 'suggested' | 'recent' | 'highest' | 'lowest';
 
-/* ================== Page ================== */
-const ProductDetailPage: NextPage<ProductDetailPageProps> = ({
-  product,
-  initialReviews,
-  seller,
-}) => {
+const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, initialReviews, seller }) => {
   const { currentUser } = useAuth();
   const [reviews, setReviews] = useState<Review[]>(initialReviews);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
-
-  // UI kecil: form ulasan disembunyikan sampai user klik
   const [showForm, setShowForm] = useState(false);
-
   const [sortKey, setSortKey] = useState<SortKey>('suggested');
   const [openSort, setOpenSort] = useState(false);
 
@@ -435,8 +413,10 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({
 /* ================== SSG ================== */
 export const getStaticPaths: GetStaticPaths = async () => {
   try {
+    const { getFirestore } = await import('@/lib/firebaseAdmin'); // ⬅️ server-only
+    const db = getFirestore();
     const snap = await db.collection('products').get();
-    const paths = snap.docs.map(doc => ({ params: { id: doc.id } }));
+     const paths = snap.docs.map((doc: any) => ({ params: { id: doc.id } })); // ⬅️ beri tipe any agar TS tidak protes
     return { paths, fallback: 'blocking' };
   } catch {
     return { paths: [], fallback: 'blocking' };
@@ -446,6 +426,9 @@ export const getStaticPaths: GetStaticPaths = async () => {
 export const getStaticProps: GetStaticProps = async ctx => {
   const { id } = ctx.params as { id: string };
   try {
+    const { getFirestore } = await import('@/lib/firebaseAdmin'); // ⬅️ server-only
+    const db = getFirestore();
+
     const productDoc = await db.collection('products').doc(id).get();
     if (!productDoc.exists) return { notFound: true };
 
@@ -467,9 +450,8 @@ export const getStaticProps: GetStaticProps = async ctx => {
       whatsapp: (sellerDoc.exists && sellerDoc.data()?.whatsapp) || '',
     };
 
-    const reviewsRes = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/reviews?productId=${product.id}`,
-    );
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+    const reviewsRes = await fetch(`${baseUrl}/api/reviews?productId=${product.id}`);
     const initialReviews: Review[] = reviewsRes.ok ? await reviewsRes.json() : [];
 
     return {

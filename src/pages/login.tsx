@@ -1,10 +1,8 @@
-// LOKASI FILE: src/pages/login.tsx
-
+// src/pages/login.tsx
 import { useState, useEffect, FormEvent } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/context/AuthContext';
 import { auth, db } from '@/lib/firebase';
-// DIUBAH: Impor 'sendPasswordResetEmail'
 import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Mail, Lock, Store, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
@@ -12,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 
 const LoginPage = () => {
-  const { currentUser, loading: authLoading } = useAuth();
+  const { currentUser, loading: authLoading, userRole } = useAuth(); // ⬅️ ambil userRole
   const router = useRouter();
   
   const [email, setEmail] = useState('');
@@ -20,20 +18,19 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // BARU: State untuk modal lupa password
+  // Reset Password modal states
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetMessage, setResetMessage] = useState<{type: 'success'|'error', text: string} | null>(null);
   const [resetLoading, setResetLoading] = useState(false);
 
-  useEffect(() => {
+   useEffect(() => {
     if (!authLoading && currentUser) {
-      const role = currentUser.role;
-      if (role === 'admin') router.push('/admin/dashboard');
-      else if (role === 'penjual') router.push('/dashboard');
+      if (userRole === 'admin') router.push('/admin/dashboard');
+      else if (userRole === 'penjual') router.push('/dashboard');
       else router.push('/');
     }
-  }, [currentUser, authLoading, router]);
+  }, [currentUser, authLoading, userRole, router]);
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -41,7 +38,7 @@ const LoginPage = () => {
     setError('');
     try {
       await signInWithEmailAndPassword(auth, email, password);
-    } catch (err: any) {
+    } catch {
       setError('Email atau password salah.');
       setLoading(false);
     }
@@ -72,7 +69,6 @@ const LoginPage = () => {
     }
   };
 
-  // BARU: Fungsi untuk menangani lupa password
   const handlePasswordReset = async (e: FormEvent) => {
     e.preventDefault();
     setResetLoading(true);
@@ -80,7 +76,7 @@ const LoginPage = () => {
     try {
       await sendPasswordResetEmail(auth, resetEmail);
       setResetMessage({ type: 'success', text: 'Link reset password telah dikirim ke email Anda.' });
-    } catch (err: any) {
+    } catch {
       setResetMessage({ type: 'error', text: 'Email tidak ditemukan atau terjadi kesalahan.' });
     } finally {
       setResetLoading(false);

@@ -1,12 +1,20 @@
-// LOKASI FILE: src/pages/api/toko/[id].ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { db } from '@/lib/firebaseAdmin';
+import { getAuth, getFirestore } from '@/lib/firebaseAdmin';
 
 async function getProductCountByOwner(ownerId: string) {
   try {
-    const productsRef = db.collection('products').where('ownerId', '==', ownerId);
-    const agg = await productsRef.count().get();
-    return agg.data().count || 0;
+    const db = getFirestore(); // ⬅️ ambil di sini, jangan pakai variabel di luar scope
+    // Aggregation count() jika tersedia:
+    // @ts-ignore
+    if (typeof (db.collection('products').where('ownerId', '==', ownerId) as any).count === 'function') {
+      // @ts-ignore
+      const agg = await (db.collection('products').where('ownerId', '==', ownerId) as any).count().get();
+      // @ts-ignore
+      return agg.data()?.count || 0;
+    }
+    // Fallback manual
+    const snap = await db.collection('products').where('ownerId', '==', ownerId).get();
+    return snap.size;
   } catch {
     return 0;
   }
@@ -22,17 +30,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!id) return res.status(400).json({ error: 'Missing toko id' });
 
   try {
+    const db = getFirestore();
     const userDoc = await db.collection('users').doc(id).get();
     if (!userDoc.exists) return res.status(404).json({ error: 'Toko tidak ditemukan' });
 
     const u = userDoc.data() || {};
     const toko = {
       id: userDoc.id,
-      name: u.shopName || u.displayName || 'Toko',
-      imageUrl: u.shopImageUrl || u.photoURL || '',
-      description: u.description || '',
+      name: (u as any).shopName || (u as any).displayName || 'Toko',
+      imageUrl: (u as any).shopImageUrl || (u as any).photoURL || '',
+      description: (u as any).description || '',
       productCount: await getProductCountByOwner(userDoc.id),
-      // tambahkan field lain bila perlu (whatsapp, social, dsb)
     };
 
     return res.status(200).json(toko);

@@ -1,220 +1,243 @@
 // LOKASI FILE: src/pages/admin/dashboard.tsx
-
 import type { GetServerSideProps, NextPage } from 'next';
-import { useState, FormEvent, ChangeEvent } from 'react';
-import { Plus, Edit, Trash2, X as CloseIcon } from 'lucide-react';
-import type { Training } from '../api/trainings';
-import { motion, AnimatePresence } from 'framer-motion';
-import AdminLayout from '@/components/Layout/AdminLayout';
+import AdminLayout from '@/components/layout/AdminLayout';
+import { motion } from 'framer-motion';
+import Link from 'next/link';
+import { Users, ShoppingCart, BookOpen, Clock, ChevronRight, Inbox } from 'lucide-react';
 import nookies from 'nookies';
-import { admin } from '@/lib/firebaseAdmin';
 
-interface AdminDashboardPageProps {
-  initialTrainings: Training[];
+type MiniTraining = { id: string; title: string; schedule?: string; location?: string };
+type MiniUser = { uid: string; displayName?: string; shopName?: string; email?: string };
+
+interface DashboardProps {
+  counts: {
+    sellers: number;
+    products: number;
+    trainings: number;
+    pendingSellers: number;
+  };
+  recentTrainings: MiniTraining[];
+  recentPending: MiniUser[];
 }
 
-const AdminDashboardPage: NextPage<AdminDashboardPageProps> = ({ initialTrainings }) => {
-  const [trainings, setTrainings] = useState<Training[]>(initialTrainings);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
-  const [currentTraining, setCurrentTraining] = useState<Partial<Training>>({});
-  const [formError, setFormError] = useState('');
-  
-  const fetchTrainings = async () => {
-    try {
-      const res = await fetch('/api/trainings');
-      const data = await res.json();
-      setTrainings(data);
-    } catch (error) {
-      console.error("Gagal mengambil data pelatihan:", error);
-    }
-  };
-
-  const openModal = (mode: 'add' | 'edit', training?: Training) => {
-    setFormError('');
-    setModalMode(mode);
-    setCurrentTraining(mode === 'add' ? {} : training || {});
-    setIsModalOpen(true);
-  };
-  
-  const handleFormChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setCurrentTraining({ ...currentTraining, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setFormError('');
-    const url = modalMode === 'add' ? '/api/trainings' : `/api/trainings/${currentTraining.id}`;
-    const method = modalMode === 'add' ? 'POST' : 'PUT';
-    
-    try {
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(currentTraining),
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Terjadi kesalahan pada server.');
-      }
-      setIsModalOpen(false);
-      fetchTrainings();
-    } catch (error) {
-      if (error instanceof Error) {
-        setFormError(error.message);
-      }
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (window.confirm("Yakin ingin menghapus pelatihan ini?")) {
-      try {
-        await fetch(`/api/trainings/${id}`, { method: 'DELETE' });
-        fetchTrainings();
-      } catch (error) {
-        console.error("Gagal menghapus data:", error);
-      }
-    }
-  };
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0 },
-  };
-
+const AdminDashboardPage: NextPage<DashboardProps> = ({ counts, recentTrainings, recentPending }) => {
   return (
     <AdminLayout>
       <div className="p-6 lg:p-10">
-        <motion.div 
-          className="flex justify-between items-center mb-6"
-          initial="hidden"
-          animate="visible"
-          variants={containerVariants}
+        <motion.div
+          className="mb-8"
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
         >
-          <motion.h2 variants={itemVariants} className="text-2xl font-bold text-gray-800">
-            Manajemen Pelatihan
-          </motion.h2>
-          <motion.button 
-            onClick={() => openModal('add')} 
-            className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-md shadow-md hover:bg-blue-700 transition-all duration-300"
-            whileHover={{ scale: 1.05, y: -2 }}
-            whileTap={{ scale: 0.95 }}
-            variants={itemVariants}
-          >
-            <Plus size={20} className="mr-2" /> 
-            Tambah Pelatihan
-          </motion.button>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-600 mt-1">Ringkasan sistem & tindakan cepat.</p>
         </motion.div>
 
-        <motion.div variants={itemVariants} className="rounded-xl shadow-md bg-white w-full border border-gray-200 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="text-left text-gray-600 uppercase font-semibold px-4 py-3">Judul Pelatihan</th>
-                <th className="text-left text-gray-600 uppercase font-semibold px-4 py-3">Jadwal</th>
-                <th className="text-left text-gray-600 uppercase font-semibold px-4 py-3">Lokasi</th>
-                <th className="text-right text-gray-600 uppercase font-semibold px-4 py-3">Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {trainings.length > 0 ? (
-                trainings.map((t, index) => (
-                  <motion.tr 
-                    key={t.id} 
-                    className="hover:bg-gray-50 transition-colors duration-200 ease-in-out"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: index * 0.05 }}
-                  >
-                    <td className="px-4 py-3 border-b border-gray-200 text-gray-800 font-medium">{t.title}</td>
-                    <td className="px-4 py-3 border-b border-gray-200 text-gray-600">{t.schedule}</td>
-                    <td className="px-4 py-3 border-b border-gray-200 text-gray-600">{t.location}</td>
-                    <td className="px-4 py-3 border-b border-gray-200 text-right">
-                      <div className="flex justify-end items-center gap-2">
-                          <motion.button onClick={() => openModal('edit', t)} className="p-2 text-gray-500 hover:text-blue-600 rounded-full hover:bg-blue-100 transition-colors" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                              <Edit size={16}/>
-                          </motion.button>
-                          <motion.button onClick={() => handleDelete(t.id)} className="p-2 text-gray-500 hover:text-red-600 rounded-full hover:bg-red-100 transition-colors" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                              <Trash2 size={16}/>
-                          </motion.button>
-                      </div>
-                    </td>
-                  </motion.tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={4} className="text-center py-10 text-gray-500">Belum ada data pelatihan.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </motion.div>
-      </div> {/* <-- DI PERBAIKI: Tag penutup yang benar sekarang adalah </div> */}
-      
-      <AnimatePresence>
-        {isModalOpen && (
-          <motion.div 
-            className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+        {/* Kartu metrik */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <motion.div
+            className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
+            whileHover={{ y: -2 }}
           >
-            <motion.div 
-              className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-2xl relative"
-              initial={{ scale: 0.9, y: 20, opacity: 0 }}
-              animate={{ scale: 1, y: 0, opacity: 1 }}
-              exit={{ scale: 0.9, y: 20, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            >
-              <motion.button onClick={() => setIsModalOpen(false)} className="absolute top-3 right-3 text-gray-400 hover:text-gray-800 hover:bg-gray-100 rounded-full p-1.5 transition" whileTap={{ scale: 0.8 }}><CloseIcon size={20} /></motion.button>
-              <h2 className="text-xl font-bold mb-5 text-slate-800">{modalMode === 'add' ? 'Tambah Pelatihan Baru' : 'Edit Pelatihan'}</h2>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                  <input type="text" name="title" placeholder="Judul Pelatihan" value={currentTraining.title || ''} onChange={handleFormChange} className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:ring-2 focus:ring-blue-400" required/>
-                  <textarea name="description" placeholder="Deskripsi" value={currentTraining.description || ''} onChange={handleFormChange} rows={4} className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:ring-2 focus:ring-blue-400 resize-none" required></textarea>
-                  <input type="text" name="schedule" placeholder="Jadwal (Contoh: Sabtu, 20 Juli 2024)" value={currentTraining.schedule || ''} onChange={handleFormChange} className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:ring-2 focus:ring-blue-400" required/>
-                  <input type="text" name="location" placeholder="Lokasi (Contoh: Online via Zoom)" value={currentTraining.location || ''} onChange={handleFormChange} className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:ring-2 focus:ring-blue-400" required/>
-                  <input type="text" name="organizer" placeholder="Penyelenggara" value={currentTraining.organizer || ''} onChange={handleFormChange} className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm focus:ring-2 focus:ring-blue-400" required/>
-                  <div className="flex justify-end pt-2">
-                    <motion.button type="submit" className="bg-blue-600 text-white font-semibold py-2 px-5 rounded-md" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>Simpan</motion.button>
-                  </div>
-                  {formError && (<p className="text-red-600 text-sm text-center mt-2">{formError}</p>)}
-              </form>
-            </motion.div>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-500">UMKM Aktif</p>
+              <Users className="text-blue-600" size={18} />
+            </div>
+            <p className="text-2xl font-extrabold text-gray-900 mt-1">{counts.sellers}</p>
           </motion.div>
-        )}
-      </AnimatePresence>
+
+          <motion.div
+            className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
+            whileHover={{ y: -2 }}
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-500">Produk Aktif</p>
+              <ShoppingCart className="text-emerald-600" size={18} />
+            </div>
+            <p className="text-2xl font-extrabold text-gray-900 mt-1">{counts.products}</p>
+          </motion.div>
+
+          <motion.div
+            className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
+            whileHover={{ y: -2 }}
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-500">Pelatihan Terjadwal</p>
+              <BookOpen className="text-amber-600" size={18} />
+            </div>
+            <p className="text-2xl font-extrabold text-gray-900 mt-1">{counts.trainings}</p>
+          </motion.div>
+
+          <motion.div
+            className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
+            whileHover={{ y: -2 }}
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-500">Menunggu Persetujuan</p>
+              <Clock className="text-rose-600" size={18} />
+            </div>
+            <p className="text-2xl font-extrabold text-gray-900 mt-1">{counts.pendingSellers}</p>
+          </motion.div>
+        </div>
+
+        {/* Dua kolom: pending approvals & pelatihan terdekat */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <motion.div
+            className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-gray-100">
+              <h2 className="font-semibold text-gray-800">Pendaftaran Penjual Baru</h2>
+              <Link
+                href="/admin/persetujuan"
+                className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+              >
+                Lihat semua <ChevronRight size={16} />
+              </Link>
+            </div>
+            {recentPending.length > 0 ? (
+              <ul className="divide-y divide-gray-100">
+                {recentPending.map((u) => (
+                  <li key={u.uid} className="p-4">
+                    <p className="font-medium text-gray-800">{u.displayName || u.email || 'Tanpa nama'}</p>
+                    <p className="text-sm text-gray-500">{u.shopName || '-'}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="p-8 text-center text-gray-500">
+                <Inbox className="mx-auto mb-2 text-gray-400" />
+                Tidak ada yang pending.
+              </div>
+            )}
+          </motion.div>
+
+          <motion.div
+            className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-gray-100">
+              <h2 className="font-semibold text-gray-800">Pelatihan Terbaru</h2>
+              <Link
+                href="/admin/pelatihan"
+                className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+              >
+                Kelola pelatihan <ChevronRight size={16} />
+              </Link>
+            </div>
+            {recentTrainings.length > 0 ? (
+              <ul className="divide-y divide-gray-100">
+                {recentTrainings.map((t) => (
+                  <li key={t.id} className="p-4">
+                    <p className="font-medium text-gray-800">{t.title}</p>
+                    <p className="text-sm text-gray-500">
+                      {t.schedule || '-'} • {t.location || '-'}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="p-8 text-center text-gray-500">
+                <Inbox className="mx-auto mb-2 text-gray-400" />
+                Belum ada jadwal.
+              </div>
+            )}
+          </motion.div>
+        </div>
+
+        {/* Quick actions */}
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Link
+            href="/admin/pelatihan"
+            className="px-4 py-2 rounded-md bg-blue-600 text-white font-semibold hover:bg-blue-700"
+          >
+            Tambah Pelatihan
+          </Link>
+          <Link
+            href="/admin/persetujuan"
+            className="px-4 py-2 rounded-md bg-slate-200 text-slate-800 font-semibold hover:bg-slate-300"
+          >
+            Kelola Persetujuan
+          </Link>
+          <Link
+            href="/admin/produk"
+            className="px-4 py-2 rounded-md bg-emerald-600 text-white font-semibold hover:bg-emerald-700"
+          >
+            Kelola Produk
+          </Link>
+        </div>
+      </div>
     </AdminLayout>
   );
 };
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
   try {
-    const cookies = nookies.get(context);
-    const token = await admin.auth().verifyIdToken(cookies.token || '');
+    // 🔒 server-only import agar Admin SDK tidak ter-bundle ke klien
+    const { getAuth, getFirestore } = await import('@/lib/firebaseAdmin');
 
-    const userDoc = await admin.firestore().collection('users').doc(token.uid).get();
+    const cookies = nookies.get(context);
+    const tokenStr = cookies.token || '';
+
+    const adminAuth = getAuth();
+    const db = getFirestore();
+
+    const decoded = await adminAuth.verifyIdToken(tokenStr);
+
+    const userDoc = await db.collection('users').doc(decoded.uid).get();
     if (userDoc.data()?.role !== 'admin') {
       return { redirect: { destination: '/', permanent: false } };
     }
-    
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-    const res = await fetch(`${apiUrl}/api/trainings`);
-    let trainings: Training[] = [];
-    if (res.ok) {
-        trainings = await res.json();
-    }
-    
-    const sortedTrainings = trainings.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-    
-    return {
-      props: { initialTrainings: JSON.parse(JSON.stringify(sortedTrainings)) },
+
+    const [
+      sellersSnap,
+      pendingSnap,
+      productsSnap,
+      trainingsSnap,
+      recentTrainingsSnap,
+      recentPendingSnap,
+    ] = await Promise.all([
+      db.collection('users').where('role', '==', 'penjual').get(),
+      db.collection('users').where('role', '==', 'pending_penjual').get(),
+      db.collection('products').get(),
+      db.collection('trainings').get(),
+      db.collection('trainings').orderBy('createdAt', 'desc').limit(3).get(),
+      db.collection('users').where('role', '==', 'pending_penjual').limit(5).get(),
+    ]);
+
+    const counts = {
+      sellers: sellersSnap.size,
+      products: productsSnap.size,
+      trainings: trainingsSnap.size,
+      pendingSellers: pendingSnap.size,
     };
-  } catch (error) {
+
+    const recentTrainings: MiniTraining[] = recentTrainingsSnap.docs.map((d) => {
+      const data = d.data() as any;
+      return {
+        id: d.id,
+        title: data?.title || '',
+        schedule: data?.schedule || '',
+        location: data?.location || '',
+      };
+    });
+
+    const recentPending: MiniUser[] = recentPendingSnap.docs.map((d) => {
+      const data = d.data() as any;
+      return {
+        uid: d.id,
+        displayName: data?.displayName || '',
+        shopName: data?.shopName || '',
+        email: data?.email || '',
+      };
+    });
+
+    return {
+      props: { counts, recentTrainings, recentPending },
+    };
+  } catch {
     return { redirect: { destination: '/login', permanent: false } };
   }
 };

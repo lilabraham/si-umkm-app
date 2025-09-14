@@ -1,63 +1,46 @@
-// LOKASI FILE: src/pages/api/reviews/index.ts
-
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore'; // PERBAIKAN: Menghapus 'orderBy' yang tidak terpakai
+import { getFirestore } from '@/lib/firebaseAdmin';
+import { FieldValue } from 'firebase-admin/firestore';
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  const reviewsCollection = collection(db, 'reviews');
+const db = getFirestore();
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const col = db.collection('reviews');
 
   if (req.method === 'GET') {
     try {
       const { productId } = req.query;
-
       if (typeof productId !== 'string' || !productId) {
         return res.status(400).json({ message: 'productId diperlukan.' });
-      }
-
-      const q = query(
-        reviewsCollection, 
-        where("productId", "==", productId)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      
-      const reviews = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      res.status(200).json(reviews);
-
+        }
+      const snap = await col.where('productId', '==', productId).get();
+      const reviews = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+      return res.status(200).json(reviews);
     } catch (error) {
-      console.error("API Reviews Error:", error);
-      res.status(500).json({ message: 'Gagal mengambil ulasan.', error });
+      console.error('API Reviews Error:', error);
+      return res.status(500).json({ message: 'Gagal mengambil ulasan.', error });
     }
-  } 
-  else if (req.method === 'POST') {
+  } else if (req.method === 'POST') {
     try {
       const { productId, userId, userName, rating, comment } = req.body;
       if (!productId || !userId || !userName || !rating || !comment) {
         return res.status(400).json({ message: 'Data ulasan tidak lengkap.' });
       }
       const newReview = {
-        productId, userId, userName,
+        productId,
+        userId,
+        userName,
         rating: Number(rating),
         comment,
-        createdAt: serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
       };
-      const docRef = await addDoc(reviewsCollection, newReview);
-      res.status(201).json({ id: docRef.id, ...newReview, createdAt: { seconds: Date.now() / 1000, nanoseconds: 0 } });
-
+      const docRef = await col.add(newReview);
+      return res.status(201).json({ id: docRef.id, ...newReview });
     } catch (error) {
-      res.status(500).json({ message: 'Gagal menyimpan ulasan.', error });
+      return res.status(500).json({ message: 'Gagal menyimpan ulasan.', error });
     }
-  } 
-  else {
+  } else {
     res.setHeader('Allow', ['GET', 'POST']);
-    res.status(405).end(`Metode ${req.method} Tidak Diizinkan`);
+    return res.status(405).end(`Metode ${req.method} Tidak Diizinkan`);
   }
 }

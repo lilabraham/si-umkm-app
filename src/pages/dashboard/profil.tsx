@@ -12,7 +12,7 @@ import { updateProfile } from 'firebase/auth';
 import { Loader2, AlertTriangle, CheckCircle, User, Camera, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import withAuth from '@/components/common/withAuth';
-import SellerLayout from '@/components/Layout/SellerLayout';
+import SellerLayout from '@/components/layout/SellerLayout';
 
 interface ProfileData {
   shopName: string;

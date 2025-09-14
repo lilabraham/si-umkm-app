@@ -1,11 +1,12 @@
+// LOKASI FILE: src/components/Layout/Navbar.tsx
+
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/context/AuthContext';
-import { auth, db } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
 import {
   Menu,
   X,
@@ -21,28 +22,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const { currentUser, loading } = useAuth();
+  const { currentUser, loading, userRole } = useAuth(); // ← role dari Context
   const router = useRouter();
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
-  // Ambil role dari Firestore (bukan dari objek User Firebase)
-  const [userRole, setUserRole] = useState<string | null>(null);
-  useEffect(() => {
-    const fetchRole = async () => {
-      if (!currentUser) {
-        setUserRole(null);
-        return;
-      }
-      try {
-        const snap = await getDoc(doc(db, 'users', currentUser.uid));
-        setUserRole((snap.data() as any)?.role ?? null);
-      } catch {
-        setUserRole(null);
-      }
-    };
-    fetchRole();
-  }, [currentUser]);
+  // ⬇️ Hindari hydration mismatch: render non-active saat SSR/initial render.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -61,8 +48,11 @@ const Navbar = () => {
     router.push('/');
   };
 
+  // Utility: samakan perbandingan path (tanpa query/hash)
+  const normalize = (p: string) => p.split('?')[0].split('#')[0];
+
   const NavLink = ({ href, children }: { href: string; children: React.ReactNode }) => {
-    const isActive = router.pathname === href;
+    const isActive = mounted && normalize(router.asPath) === href; // aktifkan hanya setelah mounted
     return (
       <Link href={href} legacyBehavior>
         <a
@@ -71,6 +61,7 @@ const Navbar = () => {
           }`}
         >
           {children}
+          {/* underline muncul setelah mounted supaya tidak beda dengan SSR */}
           {isActive && (
             <motion.div
               className="absolute -bottom-2 left-0 right-0 h-0.5 bg-blue-600"
@@ -83,7 +74,7 @@ const Navbar = () => {
   };
 
   const AdminNavLink = ({ href, children }: { href: string; children: React.ReactNode }) => {
-    const isActive = router.pathname.startsWith(href);
+    const isActive = mounted && normalize(router.asPath).startsWith(href);
     return (
       <Link href={href} legacyBehavior>
         <a
@@ -109,7 +100,7 @@ const Navbar = () => {
     children: React.ReactNode;
     onClick: () => void;
   }) => {
-    const isActive = router.pathname === href;
+    const isActive = mounted && normalize(router.asPath) === href;
     const activeClasses = 'text-blue-600 font-semibold border-l-4 border-blue-600 pl-4';
     const inactiveClasses = 'text-slate-800 font-bold pl-5 hover:text-blue-600';
     return (
@@ -131,9 +122,9 @@ const Navbar = () => {
   } as const;
   const mobileLinkVariants = { hidden: { x: 50, opacity: 0 }, visible: { x: 0, opacity: 1 } };
 
-  // Cache-buster kecil untuk foto profil biar cepat sinkron setelah update
+  // Cache-buster kecil untuk foto profil
   const avatarSrc = currentUser?.photoURL
-    ? `${currentUser.photoURL}?v=${currentUser?.metadata?.lastSignInTime || Date.now()}`
+    ? `${currentUser.photoURL}?v=${currentUser?.metadata?.lastSignInTime || ''}`
     : '';
 
   return (

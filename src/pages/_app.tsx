@@ -3,8 +3,8 @@
 import '@/styles/globals.css';
 import type { AppProps } from 'next/app';
 // DIUBAH: Menggunakan path 'layout' huruf kecil untuk konsistensi
-import Navbar from '@/components/Layout/Navbar';
-import Footer from '@/components/Layout/Footer';
+import Navbar from '@/components/layout/Navbar';
+import Footer from '@/components/layout/Footer';
 import { AuthProvider } from '@/context/AuthContext';
 import { ApolloProvider, ApolloClient, InMemoryCache } from '@apollo/client';
 

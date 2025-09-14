@@ -1,6 +1,6 @@
 // LOKASI FILE: src/pages/api/produk/index.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { db } from '@/lib/firebaseAdmin';
+import { getFirestore } from '@/lib/firebaseAdmin';
 
 type Product = {
   id: string;
@@ -22,6 +22,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    const db = getFirestore();
+
     const { tokoId, kategori, q } = req.query as {
       tokoId?: string;
       kategori?: string;
@@ -29,32 +31,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
 
     let ref: FirebaseFirestore.Query = db.collection('products');
-
-    if (tokoId) {
-      ref = ref.where('ownerId', '==', tokoId);
-    }
-    if (kategori) {
-      ref = ref.where('category', '==', kategori);
-    }
-
-    // ⛔️ JANGAN orderBy di sini agar tidak perlu index komposit
-    // // ref = ref.orderBy('createdAt', 'desc');
+    if (tokoId) ref = ref.where('ownerId', '==', tokoId);
+    if (kategori) ref = ref.where('category', '==', kategori);
 
     const snap = await ref.get();
     let items: Product[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
 
-    // Filter q (fallback sederhana)
     if (q && q.trim()) {
       const s = q.trim().toLowerCase();
       items = items.filter((p) => p.name?.toLowerCase().includes(s));
     }
 
-    // ✅ Urutkan di memori berdasarkan createdAt desc jika ada
-    items.sort(
-      (a, b) =>
-        (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)
-    );
-
+    items.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
     return res.status(200).json(items);
   } catch (e: any) {
     console.error('[GET /api/produk] Error:', e);

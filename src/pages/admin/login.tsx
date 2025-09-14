@@ -1,54 +1,47 @@
 // LOKASI FILE: src/pages/admin/login.tsx
-
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/router';
 import { ShieldCheck, User, Lock, Loader2, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
-// DIUBAH: Impor yang diperlukan dari Firebase
+
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
+
+// ⬇️ gunakan SDK CLIENT
 import { auth, db } from '@/lib/firebase';
 
-
 const AdminLoginPage = () => {
-  // DIUBAH: 'username' menjadi 'email' agar sesuai dengan Firebase Auth
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // ======================= LOGIKA UTAMA DIPERBARUI DI SINI =======================
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
     try {
-      // 1. Lakukan login menggunakan Firebase Authentication
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // 2. Cek peran pengguna di database Firestore
-      const userDocRef = doc(db, "users", user.uid);
+      const userDocRef = doc(db, 'users', user.uid);
       const userDoc = await getDoc(userDocRef);
 
-      // 3. Verifikasi apakah pengguna adalah admin
       if (userDoc.exists() && userDoc.data().role === 'admin') {
-        // Jika benar admin, arahkan ke dashboard
         router.push('/admin/dashboard');
       } else {
-        // Jika bukan admin (atau datanya tidak ada), logout paksa dan beri pesan error
-        await auth.signOut();
-        setError("Akses ditolak. Akun ini bukan merupakan akun admin.");
+        // tetap dibiarkan seperti logicmu (tanpa mengubah)
+        // @ts-ignore - jika pakai compat, ini valid
+        await auth.signOut?.();
+        setError('Akses ditolak. Akun ini bukan merupakan akun admin.');
       }
-
     } catch (err: any) {
-      // Menangani error dari Firebase (misal: password salah)
       setError(err.message.replace('Firebase: ', ''));
     } finally {
-      setLoading(false);  
+      setLoading(false);
     }
   };
   // ==============================================================================
