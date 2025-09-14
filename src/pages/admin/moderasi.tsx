@@ -8,10 +8,13 @@ import { getAuth, getFirestore } from '@/lib/firebaseAdmin';
 import { useAuth } from '@/context/AuthContext';
 import { Search } from 'lucide-react';
 
+/* =========================
+ * Types
+ * ======================= */
 type ReportItem = {
-  id: string;
+  id: string; // reportId
   targetType: 'product' | 'review';
-  targetId: string;
+  targetId: string; // productId / reviewId
   reason?: string;
   status?: 'pending' | 'resolved';
   createdAt?: { seconds: number; nanoseconds: number } | null;
@@ -26,11 +29,15 @@ type ReportItem = {
   } | null;
 };
 
+/* =========================
+ * Page
+ * ======================= */
 const ModerasiPage: NextPage = () => {
   const { currentUser } = useAuth();
 
+  // UI state
   const [items, setItems] = useState<ReportItem[]>([]);
-  const [type, setType] = useState<'all' | 'product'>('product'); // review belum diimplementasi server → default product
+  const [type, setType] = useState<'all' | 'product'>('product'); // (review belum diimplementasikan di server)
   const [status, setStatus] = useState<'all' | 'pending' | 'resolved'>('pending');
   const [q, setQ] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -42,27 +49,57 @@ const ModerasiPage: NextPage = () => {
     [selected]
   );
 
+  /* =========================
+   * Fetch list (GET /api/admin/moderation)
+   * ======================= */
   const fetchReports = async () => {
     setLoading(true);
     setMsg('');
     try {
       const token = await currentUser?.getIdToken();
+
+      // Map status UI → status API
+      // UI: pending | resolved | all
+      // API: pending | approved | hidden | all
+      const apiStatus =
+        status === 'pending' ? 'pending' : status === 'resolved' ? 'approved' : 'all';
+
+      // Saat ini hanya produk (kalau "Semua" tetap kirim product agar ada data)
+      const apiType = type === 'product' ? 'product' : 'product';
+
       const params = new URLSearchParams();
-      params.set('type', type);
-      params.set('status', status);
+      params.set('type', apiType);
+      params.set('status', apiStatus);
       if (q.trim()) params.set('q', q.trim());
 
-      const res = await fetch(`/api/admin/reports?${params.toString()}`, {
+      const res = await fetch(`/api/admin/moderation?${params.toString()}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
 
       const data = await res.json();
-      if (res.ok) {
-        setItems(Array.isArray(data.items) ? data.items : []);
-        setSelected({});
-      } else {
-        setMsg(data?.error || 'Gagal memuat data.');
-      }
+      if (!res.ok) throw new Error(data?.error || 'Gagal memuat data.');
+
+      // Map payload API → shape tabel
+      // API: { reportId, productId, reason, status('pending'|'approved'|'hidden'|'dismissed'),
+      //        visibility('visible'|'hidden'), reportedAt, product{ name, shopName, imageUrl } }
+      const mapped: ReportItem[] = (data.items || []).map((it: any) => ({
+        id: it.reportId,
+        targetType: 'product',
+        targetId: it.productId,
+        reason: it.reason || '',
+        status: it.status === 'pending' ? 'pending' : 'resolved',
+        createdAt: it.reportedAt || null,
+        product: {
+          id: it.productId,
+          name: it.product?.name || '',
+          imageUrl: it.product?.imageUrl || '',
+          shopName: it.product?.shopName || '',
+          visibility: it.visibility === 'hidden' ? 'hidden' : 'public',
+        },
+      }));
+
+      setItems(mapped);
+      setSelected({});
     } catch (e: any) {
       setMsg(e?.message || 'Gagal memuat data.');
     } finally {
@@ -70,24 +107,18 @@ const ModerasiPage: NextPage = () => {
     }
   };
 
+  // load awal
   useEffect(() => {
-    // load awal
-    fetchReports();
+    // hindari fetch sebelum auth siap
+    if (currentUser !== undefined) {
+      fetchReports();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentUser]);
 
-  const onApplyFilters = (e: FormEvent) => {
-    e.preventDefault();
-    fetchReports();
-  };
-
-  const toggleAll = (checked: boolean) => {
-    if (!checked) return setSelected({});
-    const next: Record<string, boolean> = {};
-    items.forEach((it) => (next[it.id] = true));
-    setSelected(next);
-  };
-
+  /* =========================
+   * Bulk action (POST /api/admin/moderation/bulk)
+   * ======================= */
   const doAction = async (action: 'approve' | 'hide' | 'delete') => {
     if (!selectedIds.length) {
       setMsg('Pilih minimal satu report dulu.');
@@ -97,17 +128,23 @@ const ModerasiPage: NextPage = () => {
     setMsg('');
     try {
       const token = await currentUser?.getIdToken();
-      const res = await fetch('/api/admin/reports/resolve', {
+      const res = await fetch('/api/admin/moderation/bulk', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ ids: selectedIds, action }),
+        body: JSON.stringify({
+          action,          // 'approve' | 'hide' | 'delete'
+          type: 'product', // sekarang hanya produk
+          reportIds: selectedIds,
+        }),
       });
+
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || 'Gagal eksekusi tindakan.');
-      setMsg(`Berhasil ${action} ${data?.count ?? selectedIds.length} report.`);
+
+      setMsg(`Berhasil ${action} ${data?.processed ?? selectedIds.length} report.`);
       await fetchReports();
     } catch (e: any) {
       setMsg(e?.message || 'Gagal eksekusi tindakan.');
@@ -116,9 +153,32 @@ const ModerasiPage: NextPage = () => {
     }
   };
 
+  /* =========================
+   * Helpers
+   * ======================= */
+  const onApplyFilters = (e: FormEvent) => {
+    e.preventDefault();
+    fetchReports();
+  };
+
+  const toggleAll = (checked: boolean) => {
+    if (!checked) {
+      setSelected({});
+      return;
+    }
+    const next: Record<string, boolean> = {};
+    items.forEach((it) => {
+      next[it.id] = true;
+    });
+    setSelected(next);
+  };
+
   const fmtDateTime = (ts?: { seconds: number; nanoseconds: number } | null) =>
     ts?.seconds ? new Date(ts.seconds * 1000).toLocaleString('id-ID') : '-';
 
+  /* =========================
+   * Render
+   * ======================= */
   return (
     <AdminLayout>
       <div className="p-6 lg:p-10">
@@ -131,7 +191,10 @@ const ModerasiPage: NextPage = () => {
         </motion.div>
 
         {/* Filter bar */}
-        <form onSubmit={onApplyFilters} className="mb-4 flex flex-col md:flex-row gap-3 items-start md:items-center">
+        <form
+          onSubmit={onApplyFilters}
+          className="mb-4 flex flex-col md:flex-row gap-3 items-start md:items-center"
+        >
           <div className="relative w-full md:w-96">
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
               <Search size={16} />
@@ -288,6 +351,9 @@ const ModerasiPage: NextPage = () => {
   );
 };
 
+/* =========================
+ * Auth guard (server side)
+ * ======================= */
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
   try {
     const cookies = nookies.get(ctx);
