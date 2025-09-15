@@ -17,7 +17,7 @@ import {
   updateDoc,
   getDoc,
   increment,
-  runTransaction,  
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import {
@@ -32,23 +32,14 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import withAuth from '@/components/common/withAuth';
 
-// ======================
-// Kategori (konstan)
-// ======================
-const CATEGORY_OPTIONS = [
-  { label: 'Makanan', value: 'makanan' },
-  { label: 'Minuman', value: 'minuman' },
-  { label: 'Fashion', value: 'fashion' },
-  { label: 'Kerajinan', value: 'kerajinan' },
-  { label: 'Kecantikan', value: 'kecantikan' },
-  { label: 'Lainnya', value: 'lainnya' },
-] as const;
+/* =========================================
+ * Kategori (dinamis via /api/categories)
+ * ======================================= */
+type CategoryOption = { label: string; value: string };
 
-type CategoryValue = (typeof CATEGORY_OPTIONS)[number]['value'];
-
-// ======================
-// Interface Product
-// ======================
+/* =========================================
+ * Interface Product
+ * ======================================= */
 interface Product {
   id: string;
   name: string;
@@ -57,7 +48,7 @@ interface Product {
   shopName: string;
   imageUrl: string;
   ownerId: string;
-  category: CategoryValue; // <-- field kategori
+  category: string; // simpan slug/name dari admin
 }
 
 const SellerDashboardPage: NextPage = () => {
@@ -74,8 +65,46 @@ const SellerDashboardPage: NextPage = () => {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // State kategori di form (default 'lainnya')
-  const [category, setCategory] = useState<CategoryValue>('lainnya');
+  // kategori dinamis (tanpa fallback)
+  const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
+  const [category, setCategory] = useState<string>(''); // kosong saat belum ada opsi
+
+  // ===== load kategori publik (read-only) =====
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/categories?limit=200', {
+          cache: 'no-store',
+          headers: { 'cache-control': 'no-store' },
+        });
+        if (!res.ok) throw new Error('Gagal memuat kategori');
+        const data = await res.json().catch(() => ({}));
+        const items = Array.isArray(data?.items) ? data.items : [];
+        const opts: CategoryOption[] = items
+          .filter((c: any) => c?.isActive !== false)
+          .map((c: any) => ({
+            label: String(c?.name || ''),
+            value: String(c?.slug || c?.name || '').toLowerCase(),
+          }));
+        if (!cancelled) {
+          setCategoryOptions(opts);
+          setCategory((prev) => prev || (opts[0]?.value ?? '')); // tetap '' jika tidak ada kategori
+          // bersihkan error jika sebelumnya error kategori
+          setError((e) => (e === 'Kategori belum tersedia. Hubungi admin.' ? null : e));
+        }
+      } catch {
+        if (!cancelled) {
+          setCategoryOptions([]);
+          setCategory('');
+          setError((old) => old || 'Kategori belum tersedia. Hubungi admin.');
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const fetchMyProducts = async () => {
     if (!currentUser) return;
@@ -128,8 +157,12 @@ const SellerDashboardPage: NextPage = () => {
     setPreviewUrl(mode === 'edit' ? product.imageUrl || null : null);
     setProductImageFile(null);
     setError(null);
-    // set kategori saat edit atau default saat add
-    setCategory((product.category as CategoryValue) || 'lainnya');
+    // set kategori saat edit / default saat add (pakai opsi dinamis)
+    if (mode === 'edit') {
+      setCategory((product.category as string) || (categoryOptions[0]?.value ?? ''));
+    } else {
+      setCategory(categoryOptions[0]?.value ?? '');
+    }
     setIsModalOpen(true);
   };
 
@@ -144,6 +177,10 @@ const SellerDashboardPage: NextPage = () => {
     setError(null);
 
     try {
+      if (!categoryOptions.length || !category) {
+        throw new Error('Kategori belum tersedia. Hubungi admin.');
+      }
+
       let imageUrl = currentProduct.imageUrl || '';
       if (productImageFile) {
         const fileBase64 = await toBase64(productImageFile);
@@ -172,13 +209,13 @@ const SellerDashboardPage: NextPage = () => {
         shopId: currentUser.uid,
         shopName: correctShopName || '',
         ownerId: currentUser.uid,
-        category: category, // <-- simpan kategori
+        category: category, // simpan slug/name dari admin
       };
 
       if (modalMode === 'add') {
         await addDoc(collection(db, 'products'), { ...dataToSave, createdAt: serverTimestamp() });
 
-        // ➕ denormalisasi counter produk toko
+        // ➕ denormalisasi counter produk toko (legacy)
         await updateDoc(doc(db, 'users', currentUser.uid), {
           productCount: increment(1),
         });
@@ -197,27 +234,33 @@ const SellerDashboardPage: NextPage = () => {
   };
 
   const handleDelete = async (productId: string) => {
-  if (!window.confirm('Yakin ingin menghapus produk ini?')) return;
-  try {
-    await deleteDoc(doc(db, 'products', productId));
+    if (!window.confirm('Yakin ingin menghapus produk ini?')) return;
+    try {
+      await deleteDoc(doc(db, 'products', productId));
 
-    // ➖ Denormalisasi aman: pakai transaction supaya tidak jadi negatif
-    if (currentUser) {
-      const userRef = doc(db, 'users', currentUser.uid);
-      await runTransaction(db, async (tx) => {
-        const snap = await tx.get(userRef);
-        const current = Number(snap.data()?.productCount) || 0;
-        const next = Math.max(0, current - 1);
-        tx.update(userRef, { productCount: next });
-      });
+      // ➖ Denormalisasi aman: pakai transaction supaya tidak jadi negatif
+      if (currentUser) {
+        const userRef = doc(db, 'users', currentUser.uid);
+        await runTransaction(db, async (tx) => {
+          const snap = await tx.get(userRef);
+          const current = Number(snap.data()?.productCount) || 0;
+          const next = Math.max(0, current - 1);
+          tx.update(userRef, { productCount: next });
+        });
+      }
+
+      fetchMyProducts();
+    } catch (error) {
+      setError('Gagal menghapus produk.');
     }
+  };
 
-    fetchMyProducts();
-  } catch (error) {
-    setError('Gagal menghapus produk.');
-  }
-};
-
+  const categoryLabel = (val: string) => {
+    if (!val) return 'Tanpa Kategori';
+    const hit = categoryOptions.find((c) => c.value === val);
+    if (hit) return hit.label;
+    return val.charAt(0).toUpperCase() + val.slice(1);
+  };
 
   return (
     <div className="bg-slate-50 min-h-screen">
@@ -262,7 +305,7 @@ const SellerDashboardPage: NextPage = () => {
               {myProducts.map((product) => (
                 <div
                   key={product.id}
-                  className="rounded-xl border border-gray-200 p-4 flex flex-col bg-white hover:shadow-lg transition-shadow"
+                  className="rounded-xl border border-gray-200 p-4 flex col bg-white hover:shadow-lg transition-shadow"
                 >
                   <div className="relative w-full h-40 mb-3">
                     <Image src={product.imageUrl} alt={product.name} fill sizes="30vw" className="rounded-md object-cover" />
@@ -273,7 +316,7 @@ const SellerDashboardPage: NextPage = () => {
                     {/* Badge kategori kecil */}
                     <div className="mt-1">
                       <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs text-gray-600">
-                        {CATEGORY_OPTIONS.find((c) => c.value === product.category)?.label || 'Lainnya'}
+                        {categoryLabel(product.category)}
                       </span>
                     </div>
                   </div>
@@ -361,7 +404,7 @@ const SellerDashboardPage: NextPage = () => {
                       />
                     </div>
 
-                    {/* Select Kategori */}
+                    {/* Select Kategori (dinamis) */}
                     <div>
                       <label htmlFor="category" className="text-sm font-medium text-gray-700">
                         Kategori
@@ -369,15 +412,20 @@ const SellerDashboardPage: NextPage = () => {
                       <select
                         id="category"
                         value={category}
-                        onChange={(e) => setCategory(e.target.value as CategoryValue)}
+                        onChange={(e) => setCategory(e.target.value)}
                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3"
                         required
+                        disabled={!categoryOptions.length}
                       >
-                        {CATEGORY_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
+                        {categoryOptions.length ? (
+                          categoryOptions.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))
+                        ) : (
+                          <option value="">(Kategori belum tersedia)</option>
+                        )}
                       </select>
                     </div>
                   </div>
@@ -429,7 +477,7 @@ const SellerDashboardPage: NextPage = () => {
                     <button
                       type="submit"
                       className="bg-blue-600 text-white font-semibold py-2 px-5 rounded-md shadow-sm hover:bg-blue-700 transition-colors"
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || !categoryOptions.length || !category}
                     >
                       {isSubmitting ? <Loader2 className="animate-spin" /> : modalMode === 'add' ? 'Simpan Produk' : 'Simpan Perubahan'}
                     </button>

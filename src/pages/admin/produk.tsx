@@ -1,4 +1,3 @@
-// LOKASI FILE: src/pages/admin/produk.tsx
 import type { NextPage } from 'next';
 import { useEffect, useMemo, useState, ChangeEvent, FormEvent } from 'react';
 import AdminLayout from '@/components/layout/AdminLayout';
@@ -14,6 +13,7 @@ import {
   Loader2,
   RefreshCw,
 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext'; // ⬅️ tambahan
 
 type Product = {
   id: string;
@@ -25,6 +25,7 @@ type Product = {
   shopName?: string;
   category?: string;
   createdAt?: { seconds: number; nanoseconds: number };
+  visibility?: 'public' | 'hidden'; // ⬅️ tambahan (opsional, untuk tampilkan tombol Pulihkan)
 };
 
 type ApiListResponse = {
@@ -47,50 +48,51 @@ const AdminProdukPage: NextPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentProduct, setCurrentProduct] = useState<Partial<Product>>({});
 
+  const { currentUser } = useAuth(); // ⬅️ tambahan
+
   const fetchData = async () => {
-  setLoading(true);
-  setError(null);
-  try {
-    const params = new URLSearchParams();
-    if (q.trim()) params.set('q', q.trim());
-    if (sellerId !== 'all') params.set('sellerId', sellerId);
-    if (category !== 'all') params.set('category', category);
-    params.set('page', String(page));
-    params.set('pageSize', String(PAGE_SIZE));
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      if (q.trim()) params.set('q', q.trim());
+      if (sellerId !== 'all') params.set('sellerId', sellerId);
+      if (category !== 'all') params.set('category', category);
+      params.set('page', String(page));
+      params.set('pageSize', String(PAGE_SIZE));
 
-    const res = await fetch(`/api/admin/products?${params.toString()}`, {
-      method: 'GET',
-      cache: 'no-store',                 // ⬅️ cegah 304 di sisi client
-      headers: { 'cache-control': 'no-store' },
-    });
+      const res = await fetch(`/api/admin/products?${params.toString()}`, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: { 'cache-control': 'no-store' },
+      });
 
-    if (res.status === 304) {            // ⬅️ JANGAN parse JSON kalau 304
-      return;
+      if (res.status === 304) {
+        return;
+      }
+      if (!res.ok) {
+        const text = await res.text();
+        let msg = 'Gagal memuat produk.';
+        try {
+          const data = JSON.parse(text);
+          msg = data.error || msg;
+        } catch {}
+        throw new Error(msg);
+      }
+
+      const data = (await res.json().catch(() => ({ items: [] }))) as ApiListResponse;
+      setItems(data.items);
+    } catch (e: any) {
+      setError(e.message || 'Terjadi kesalahan.');
+    } finally {
+      setLoading(false);
     }
-    if (!res.ok) {
-      // coba baca text agar tidak error lagi
-      const text = await res.text();
-      let msg = 'Gagal memuat produk.';
-      try {
-        const data = JSON.parse(text);
-        msg = data.error || msg;
-      } catch {}
-      throw new Error(msg);
-    }
-
-    const data = (await res.json().catch(() => ({ items: [] }))) as ApiListResponse;
-    setItems(data.items);
-  } catch (e: any) {
-    setError(e.message || 'Terjadi kesalahan.');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   useEffect(() => {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]); // pencarian/filters dijalankan manual via tombol "Terapkan"
+  }, [page]);
 
   const uniqueSellers = useMemo(() => {
     const map = new Map<string, string>();
@@ -168,6 +170,33 @@ const AdminProdukPage: NextPage = () => {
       setError(e.message || 'Terjadi kesalahan.');
     }
   };
+
+  // ⬇️⬇️ Tambahan: aksi Pulihkan (hidden → public)
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+
+  const handleRestore = async (id: string) => {
+    setError(null);
+    try {
+      setRestoringId(id);
+      const token = await currentUser?.getIdToken();
+      const res = await fetch('/api/admin/products/visibility', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ productIds: [id], visibility: 'public' }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Gagal memulihkan produk.');
+      await fetchData();
+    } catch (e: any) {
+      setError(e.message || 'Terjadi kesalahan.');
+    } finally {
+      setRestoringId(null);
+    }
+  };
+  // ⬆️⬆️ Tambahan selesai
 
   return (
     <AdminLayout>
@@ -298,6 +327,18 @@ const AdminProdukPage: NextPage = () => {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
+                          {/* ⬇️ Tombol Pulihkan: tampil hanya jika produk hidden */}
+                          {p.visibility === 'hidden' && (
+                            <button
+                              onClick={() => handleRestore(p.id)}
+                              disabled={restoringId === p.id}
+                              className="px-2.5 py-1.5 rounded-md text-xs font-semibold border border-green-200 text-green-700 bg-green-50 hover:bg-green-100 disabled:opacity-50"
+                              title="Pulihkan produk (tampilkan kembali)"
+                            >
+                              {restoringId === p.id ? 'Memproses…' : 'Pulihkan'}
+                            </button>
+                          )}
+
                           <button
                             onClick={() => openEdit(p)}
                             className="p-2 rounded-full hover:bg-blue-100 text-slate-600 hover:text-blue-600"

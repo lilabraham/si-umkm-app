@@ -1,8 +1,6 @@
-// LOKASI FILE: src/pages/produk/produk.tsx
-
 import type { GetStaticProps, NextPage } from 'next';
 import Head from 'next/head';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Store } from 'lucide-react';
 import TokoCard from '@/components/ui/TokoCard';
@@ -14,7 +12,6 @@ interface Toko {
   name: string;
   imageUrl: string;
   productCount: number;             // jumlah produk PUBLIC yang tampil
-  // boleh ada, tapi TIDAK dikirim undefined
   publicProductCount?: number;      // hanya ditambahkan kalau memang number
 }
 
@@ -30,9 +27,7 @@ interface TokoPageProps {
  * - { data: [...] }
  * Memetakan ke { id, name, imageUrl, productCount }
  *
- * Perbaikan:
- * - productCount = productCount ?? publicProductCount ?? productsCount ?? 0
- * - TIDAK mengisi properti dengan undefined (di-skip)
+ * Aman serialisasi: tidak mengisi properti dengan undefined.
  */
 function normalizeTokoResponse(json: any): Toko[] {
   const src = Array.isArray(json)
@@ -48,15 +43,10 @@ function normalizeTokoResponse(json: any): Toko[] {
   if (!Array.isArray(src)) return [];
 
   return src.map((s: any) => {
-    // tentukan count secara aman
     let count = 0;
-    if (typeof s?.productCount === 'number') {
-      count = s.productCount;
-    } else if (typeof s?.publicProductCount === 'number') {
-      count = s.publicProductCount;
-    } else if (typeof s?.productsCount === 'number') {
-      count = s.productsCount;
-    }
+    if (typeof s?.productCount === 'number') count = s.productCount;
+    else if (typeof s?.publicProductCount === 'number') count = s.publicProductCount;
+    else if (typeof s?.productsCount === 'number') count = s.productsCount;
 
     const obj: Toko = {
       id: String(s?.id ?? s?.uid ?? ''),
@@ -64,24 +54,53 @@ function normalizeTokoResponse(json: any): Toko[] {
       imageUrl: String(s?.shopImageUrl ?? s?.imageUrl ?? ''),
       productCount: count,
     };
-
-    // hanya tambahkan publicProductCount jika benar-benar number
     if (typeof s?.publicProductCount === 'number') {
       obj.publicProductCount = s.publicProductCount;
     }
-
     return obj;
   });
 }
 
 const TokoPage: NextPage<TokoPageProps> = ({ initialToko = [] }) => {
+  // state untuk pencarian
   const [searchTerm, setSearchTerm] = useState('');
 
+  // ⬇️ state data yang ditampilkan (diisi dari SSG lalu dioverride hasil refetch client)
+  const [toko, setToko] = useState<Toko[]>(initialToko);
+  const [loadingFirstClientFetch, setLoadingFirstClientFetch] = useState(false);
+
+  // ⬇️ client-side refetch ringan saat mount → memastikan angka langsung segar
+  useEffect(() => {
+    let aborted = false;
+    const run = async () => {
+      try {
+        setLoadingFirstClientFetch(true);
+        const res = await fetch(`/api/toko?ts=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'cache-control': 'no-store' },
+        });
+        if (!res.ok) return;
+        const raw = await res.json().catch(() => []);
+        const fresh = normalizeTokoResponse(raw);
+        if (!aborted && Array.isArray(fresh) && fresh.length >= 0) {
+          setToko(fresh);
+        }
+      } finally {
+        if (!aborted) setLoadingFirstClientFetch(false);
+      }
+    };
+    run();
+    return () => {
+      aborted = true;
+    };
+  }, []);
+
+  // filter pencarian berdasarkan state 'toko' (bukan langsung props)
   const tokoToDisplay = useMemo(() => {
-    if (!searchTerm.trim()) return initialToko;
+    if (!searchTerm.trim()) return toko;
     const q = searchTerm.toLowerCase();
-    return initialToko.filter((t) => t.name.toLowerCase().includes(q));
-  }, [searchTerm, initialToko]);
+    return toko.filter((t) => t.name.toLowerCase().includes(q));
+  }, [searchTerm, toko]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -132,8 +151,8 @@ const TokoPage: NextPage<TokoPageProps> = ({ initialToko = [] }) => {
         </form>
 
         {/* Grid Toko */}
-        {initialToko.length === 0 && !searchTerm.trim() ? (
-          // 1) Skeleton state
+        {toko.length === 0 && !searchTerm.trim() ? (
+          // 1) Skeleton state (saat SSG kosong &/atau fetch awal client sedang jalan)
           <motion.div
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8"
             variants={containerVariants}
@@ -152,8 +171,8 @@ const TokoPage: NextPage<TokoPageProps> = ({ initialToko = [] }) => {
             initial="hidden"
             animate="visible"
           >
-            {tokoToDisplay.map((toko) => (
-              <TokoCard key={toko.id} toko={toko} variants={cardVariants} />
+            {tokoToDisplay.map((t) => (
+              <TokoCard key={t.id} toko={t} variants={cardVariants} />
             ))}
           </motion.div>
         ) : (
@@ -175,7 +194,7 @@ const TokoPage: NextPage<TokoPageProps> = ({ initialToko = [] }) => {
 export const getStaticProps: GetStaticProps = async () => {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-    // SSG + ISR; angka akan menyusul saat revalidate interval
+    // SSG + ISR; angka akan disegarkan lagi oleh refetch client dan revalidate on-demand
     const res = await fetch(`${apiUrl}/api/toko`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`Failed to fetch toko: ${res.status} ${res.statusText}`);
     const raw = await res.json();
@@ -184,7 +203,7 @@ export const getStaticProps: GetStaticProps = async () => {
 
     return {
       props: { initialToko: toko },
-      revalidate: 10, // perpendek supaya angka cepat ikut perubahan
+      revalidate: 10, // tetap pendek; revalidate on-demand juga sudah dipasang di endpoint admin
     };
   } catch (error) {
     console.error('Gagal mengambil data toko saat build:', error);
