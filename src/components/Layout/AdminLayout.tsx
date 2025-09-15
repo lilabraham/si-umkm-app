@@ -1,4 +1,3 @@
-// LOKASI FILE: src/components/layout/AdminLayout.tsx
 import { ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -16,13 +15,13 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const { currentUser } = useAuth();
 
   const sidebarLinks = [
-  { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
-  { name: 'Persetujuan Penjual', href: '/admin/persetujuan', icon: Users },
-  { name: 'Manajemen Produk', href: '/admin/produk', icon: ShoppingCart },
-  { name: 'Trainings', href: '/admin/pelatihan', icon: GraduationCap },
-  { name: 'Moderasi', href: '/admin/moderasi', icon: Inbox },
-  { name: 'Kategori', href: '/admin/kategori', icon: Tags },
-];
+    { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
+    { name: 'Persetujuan Penjual', href: '/admin/persetujuan', icon: Users },
+    { name: 'Manajemen Produk', href: '/admin/produk', icon: ShoppingCart },
+    { name: 'Trainings', href: '/admin/pelatihan', icon: GraduationCap },
+    { name: 'Moderasi', href: '/admin/moderasi', icon: Inbox },
+    { name: 'Kategori', href: '/admin/kategori', icon: Tags },
+  ];
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -45,15 +44,17 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                   <Link
                     key={link.name}
                     href={link.href}
-                     prefetch={false}
+                    prefetch={false}
                     className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                       isActive
                         ? 'bg-blue-100 text-blue-700'
                         : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                     }`}
                   >
-                    <link.icon size={18} />
-                    <span>{link.name}</span>
+                    <span className="flex items-center gap-3">
+                      <link.icon size={18} />
+                      <span>{link.name}</span>
+                    </span>
                   </Link>
                 );
               })}
@@ -69,7 +70,10 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                 href="/"
                 className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100"
               >
-                <Home size={18} /> Kembali ke Website
+                <span className="flex items-center gap-3">
+                  <Home size={18} />
+                  <span>Kembali ke Website</span>
+                </span>
               </Link>
               <button
                 onClick={handleLogout}

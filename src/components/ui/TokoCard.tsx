@@ -1,5 +1,3 @@
-// LOKASI FILE: src/components/ui/TokoCard.tsx
-
 import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -10,7 +8,7 @@ interface Toko {
   id: string;
   name: string;
   imageUrl: string;
-  productCount: number; // kalau API belum kirim, kita guard di bawah
+  productCount: number;
 }
 
 interface TokoCardProps {
@@ -22,7 +20,6 @@ const TokoCard = ({ toko, variants }: TokoCardProps) => {
   const [imgError, setImgError] = useState(false);
   const hasImage = !!toko.imageUrl && !imgError;
 
-  // Guard supaya selalu ada angka yang ditampilkan
   const count =
     typeof toko.productCount === 'number' && !Number.isNaN(toko.productCount)
       ? toko.productCount
@@ -35,7 +32,6 @@ const TokoCard = ({ toko, variants }: TokoCardProps) => {
         className="group block h-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md hover:border-blue-500"
         aria-label={`Lihat toko ${toko.name}`}
       >
-        {/* Gambar/banner toko */}
         <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-100">
           {hasImage ? (
             <Image
@@ -54,14 +50,11 @@ const TokoCard = ({ toko, variants }: TokoCardProps) => {
           )}
         </div>
 
-        {/* Konten */}
         <div className="p-5">
-          {/* Judul tanpa flex-1 supaya bar bawah tidak ketarik/hilang */}
           <h3 className="line-clamp-1 text-lg font-bold text-slate-800 transition-colors group-hover:text-blue-600">
             {toko.name}
           </h3>
 
-          {/* Bar bawah selalu tampil */}
           <div className="mt-3 border-t border-slate-100 pt-3 text-sm">
             <div className="flex items-center justify-between text-slate-600">
               <span className="inline-flex items-center gap-1.5">

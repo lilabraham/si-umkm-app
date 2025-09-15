@@ -88,14 +88,16 @@ const AdminDashboardPage: NextPage<DashboardProps> = ({ counts, recentTrainings,
             animate={{ opacity: 1, y: 0 }}
           >
             <div className="flex items-center justify-between p-4 border-b border-gray-100">
-              <h2 className="font-semibold text-gray-800">Pendaftaran Penjual Baru</h2>
-              <Link
-                href="/admin/persetujuan"
-                className="text-sm text-blue-600 hover:underline flex items-center gap-1"
-              >
-                Lihat semua <ChevronRight size={16} />
-              </Link>
-            </div>
+  <h2 className="font-semibold text-gray-800">Pendaftaran Penjual Baru</h2>
+  <Link
+    href="/admin/persetujuan"
+    className="text-sm text-blue-600 hover:underline"
+  >
+    <span className="flex items-center gap-1">
+      Lihat semua <ChevronRight size={16} />
+    </span>
+  </Link>
+</div>
             {recentPending.length > 0 ? (
               <ul className="divide-y divide-gray-100">
                 {recentPending.map((u) => (
@@ -119,14 +121,16 @@ const AdminDashboardPage: NextPage<DashboardProps> = ({ counts, recentTrainings,
             animate={{ opacity: 1, y: 0 }}
           >
             <div className="flex items-center justify-between p-4 border-b border-gray-100">
-              <h2 className="font-semibold text-gray-800">Pelatihan Terbaru</h2>
-              <Link
-                href="/admin/pelatihan"
-                className="text-sm text-blue-600 hover:underline flex items-center gap-1"
-              >
-                Kelola pelatihan <ChevronRight size={16} />
-              </Link>
-            </div>
+  <h2 className="font-semibold text-gray-800">Pelatihan Terbaru</h2>
+  <Link
+    href="/admin/pelatihan"
+    className="text-sm text-blue-600 hover:underline"
+  >
+    <span className="flex items-center gap-1">
+      Kelola pelatihan <ChevronRight size={16} />
+    </span>
+  </Link>
+</div>
             {recentTrainings.length > 0 ? (
               <ul className="divide-y divide-gray-100">
                 {recentTrainings.map((t) => (

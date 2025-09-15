@@ -121,7 +121,6 @@ const TokoPage: NextPage<TokoPageProps> = ({ initialToko = [] }) => {
           content="Temukan dan dukung para pelaku UMKM berbakat di sekitar Anda."
         />
       </Head>
-
       <main className="container mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-10">
         {/* Header */}
         <header className="text-center mb-8">
@@ -153,7 +152,7 @@ const TokoPage: NextPage<TokoPageProps> = ({ initialToko = [] }) => {
         {/* Grid Toko */}
         {toko.length === 0 && !searchTerm.trim() ? (
           // 1) Skeleton state (saat SSG kosong &/atau fetch awal client sedang jalan)
-          <motion.div
+          (<motion.div
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8"
             variants={containerVariants}
             initial="hidden"
@@ -162,10 +161,10 @@ const TokoPage: NextPage<TokoPageProps> = ({ initialToko = [] }) => {
             {Array.from({ length: 8 }).map((_, i) => (
               <SkeletonTokoCard key={i} variants={cardVariants} />
             ))}
-          </motion.div>
+          </motion.div>)
         ) : tokoToDisplay.length > 0 ? (
           // 2) Grid toko normal
-          <motion.div
+          (<motion.div
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8"
             variants={containerVariants}
             initial="hidden"
@@ -174,17 +173,17 @@ const TokoPage: NextPage<TokoPageProps> = ({ initialToko = [] }) => {
             {tokoToDisplay.map((t) => (
               <TokoCard key={t.id} toko={t} variants={cardVariants} />
             ))}
-          </motion.div>
+          </motion.div>)
         ) : (
           // 3) Empty state
-          <div className="text-center py-16 px-6 bg-white rounded-lg shadow-sm">
+          (<div className="text-center py-16 px-6 bg-white rounded-lg shadow-sm">
             <Store className="mx-auto text-gray-400" size={48} />
             <h3 className="mt-4 text-xl font-semibold text-gray-800">Oops! Toko tidak ditemukan</h3>
             <p className="mt-2 text-gray-500">
               Kami tidak dapat menemukan UMKM untuk kata kunci “
               <span className="font-semibold text-gray-700">{searchTerm}</span>”.
             </p>
-          </div>
+          </div>)
         )}
       </main>
     </div>

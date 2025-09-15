@@ -34,12 +34,16 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
           {/* Kolom 1: Branding */}
           <div className="md:col-span-2 lg:col-span-2">
-            <Link href="/" className="flex items-center gap-3 mb-4">
-              <div className="bg-white/10 p-2 rounded-lg">
-                <Store className="h-6 w-6 text-white" />
-              </div>
-              <span className="text-xl font-bold text-white">Si-UMKM</span>
-            </Link>
+            // ✅ Benar (satu child saja: <span>…</span>)
+<Link href="/" className="mb-4">
+  <span className="flex items-center gap-3">
+    <div className="bg-white/10 p-2 rounded-lg">
+      <Store className="h-6 w-6 text-white" />
+    </div>
+    <span className="text-xl font-bold text-white">Si-UMKM</span>
+  </span>
+</Link>
+
             <p className="text-sm max-w-sm leading-relaxed text-neutral-400">
               {SITE_TAGLINE}
             </p>
@@ -51,7 +55,10 @@ const Footer = () => {
             <ul className="space-y-3">
               {navLinks.map((link) => (
                 <li key={link.name}>
-                  <Link href={link.href} className="text-sm hover:text-white transition-colors duration-300">
+                  <Link
+                    href={link.href}
+                    className="text-sm hover:text-white transition-colors duration-300"
+                  >
                     {link.name}
                   </Link>
                 </li>

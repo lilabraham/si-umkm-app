@@ -97,7 +97,12 @@ const LoginPage = () => {
         <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 bg-white rounded-2xl shadow-xl overflow-hidden">
           <div className="hidden lg:flex flex-col justify-between p-12 bg-blue-600 text-white">
               <div>
-                  <Link href="/" className="flex items-center gap-3"><Store className="h-8 w-8" /><span className="text-2xl font-bold">Si-UMKM</span></Link>
+                  <Link href="/" className="flex items-center gap-3">
+  <span className="flex items-center gap-3">
+    <Store className="h-8 w-8" />
+    <span className="text-2xl font-bold">Si-UMKM</span>
+  </span>
+</Link>
                   <p className="mt-4 text-blue-100 leading-relaxed">Platform terpadu untuk digitalisasi dan kemajuan Usaha Mikro, Kecil, dan Menengah.</p>
               </div>
               <p className="text-sm text-blue-200">&copy; {new Date().getFullYear()} Si-UMKM. All Rights Reserved.</p>
@@ -149,7 +154,6 @@ const LoginPage = () => {
           </div>
         </div>
       </div>
-      
       {/* BARU: Modal untuk Lupa Password */}
       <AnimatePresence>
         {isResetModalOpen && (

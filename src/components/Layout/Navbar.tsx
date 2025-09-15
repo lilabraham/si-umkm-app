@@ -1,5 +1,3 @@
-// LOKASI FILE: src/components/Layout/Navbar.tsx
-
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -22,12 +20,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const { currentUser, loading, userRole } = useAuth(); // ← role dari Context
+  const { currentUser, loading, userRole } = useAuth();
   const router = useRouter();
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
-  // ⬇️ Hindari hydration mismatch: render non-active saat SSR/initial render.
+  // Hindari hydration mismatch: render state-aktif setelah mounted
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -52,23 +50,23 @@ const Navbar = () => {
   const normalize = (p: string) => p.split('?')[0].split('#')[0];
 
   const NavLink = ({ href, children }: { href: string; children: React.ReactNode }) => {
-    const isActive = mounted && normalize(router.asPath) === href; // aktifkan hanya setelah mounted
+    const isActive = mounted && normalize(router.asPath) === href;
     return (
-      <Link href={href} legacyBehavior>
-        <a
-          className={`relative text-sm font-medium transition-colors hover:text-blue-600 ${
-            isActive ? 'text-blue-600' : 'text-slate-600'
-          }`}
-        >
+      <Link
+        href={href}
+        className={`relative text-sm font-medium transition-colors hover:text-blue-600 ${
+          isActive ? 'text-blue-600' : 'text-slate-600'
+        }`}
+      >
+        <span className="relative inline-block">
           {children}
-          {/* underline muncul setelah mounted supaya tidak beda dengan SSR */}
           {isActive && (
             <motion.div
               className="absolute -bottom-2 left-0 right-0 h-0.5 bg-blue-600"
               layoutId="underline"
             />
           )}
-        </a>
+        </span>
       </Link>
     );
   };
@@ -76,21 +74,19 @@ const Navbar = () => {
   const AdminNavLink = ({ href, children }: { href: string; children: React.ReactNode }) => {
     const isActive = mounted && normalize(router.asPath).startsWith(href);
     return (
-      <Link href={href} legacyBehavior>
-        <a
-          className={`relative text-sm font-semibold transition-colors border-2 rounded-full px-3 py-1 ${
-            isActive
-              ? 'border-yellow-500 text-yellow-600 bg-yellow-100/80'
-              : 'border-transparent text-slate-600 hover:text-yellow-600'
-          }`}
-        >
-          {children}
-        </a>
+      <Link
+        href={href}
+        className={`relative text-sm font-semibold transition-colors border-2 rounded-full px-3 py-1 ${
+          isActive
+            ? 'border-yellow-500 text-yellow-600 bg-yellow-100/80'
+            : 'border-transparent text-slate-600 hover:text-yellow-600'
+        }`}
+      >
+        <span className="inline-flex items-center gap-2">{children}</span>
       </Link>
     );
   };
 
-  // Pakai <a> (legacyBehavior) supaya click tidak “mental” ke Home
   const MobileNavLink = ({
     href,
     children,
@@ -104,13 +100,12 @@ const Navbar = () => {
     const activeClasses = 'text-blue-600 font-semibold border-l-4 border-blue-600 pl-4';
     const inactiveClasses = 'text-slate-800 font-bold pl-5 hover:text-blue-600';
     return (
-      <Link href={href} legacyBehavior>
-        <a
-          onClick={onClick}
-          className={`block py-2 text-lg transition-all ${isActive ? activeClasses : inactiveClasses}`}
-        >
-          {children}
-        </a>
+      <Link
+        href={href}
+        onClick={onClick}
+        className={`block py-2 text-lg transition-all ${isActive ? activeClasses : inactiveClasses}`}
+      >
+        <span className="inline-flex items-center gap-3">{children}</span>
       </Link>
     );
   };
@@ -131,11 +126,11 @@ const Navbar = () => {
     <nav className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50 border-b border-slate-900/10">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          <Link href="/" legacyBehavior>
-            <a className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-2">
               <Store className="h-6 w-6 text-blue-600" />
               <span className="text-xl font-bold text-slate-800">Si-UMKM</span>
-            </a>
+            </span>
           </Link>
 
           {/* DESKTOP NAV */}
@@ -185,32 +180,35 @@ const Navbar = () => {
                       </div>
                       <div className="p-2">
                         {userRole === 'admin' && (
-                          <Link href="/admin/dashboard" legacyBehavior>
-                            <a
-                              onClick={() => setIsProfileMenuOpen(false)}
-                              className="flex items-center gap-3 w-full px-3 py-2 text-sm text-gray-700 hover:bg-slate-100 rounded-md"
-                            >
+                          <Link
+                            href="/admin/dashboard"
+                            onClick={() => setIsProfileMenuOpen(false)}
+                            className="flex items-center gap-3 w-full px-3 py-2 text-sm text-gray-700 hover:bg-slate-100 rounded-md"
+                          >
+                            <span className="inline-flex items-center gap-3">
                               <ShieldCheck size={16} /> Admin Panel
-                            </a>
+                            </span>
                           </Link>
                         )}
                         {userRole === 'penjual' && (
                           <>
-                            <Link href="/dashboard" legacyBehavior>
-                              <a
-                                onClick={() => setIsProfileMenuOpen(false)}
-                                className="flex items-center gap-3 w-full px-3 py-2 text-sm text-gray-700 hover:bg-slate-100 rounded-md"
-                              >
+                            <Link
+                              href="/dashboard"
+                              onClick={() => setIsProfileMenuOpen(false)}
+                              className="flex items-center gap-3 w-full px-3 py-2 text-sm text-gray-700 hover:bg-slate-100 rounded-md"
+                            >
+                              <span className="inline-flex items-center gap-3">
                                 <LayoutDashboard size={16} /> Manajemen Produk
-                              </a>
+                              </span>
                             </Link>
-                            <Link href="/dashboard/profil" legacyBehavior>
-                              <a
-                                onClick={() => setIsProfileMenuOpen(false)}
-                                className="flex items-center gap-3 w-full px-3 py-2 text-sm text-gray-700 hover:bg-slate-100 rounded-md"
-                              >
+                            <Link
+                              href="/dashboard/profil"
+                              onClick={() => setIsProfileMenuOpen(false)}
+                              className="flex items-center gap-3 w-full px-3 py-2 text-sm text-gray-700 hover:bg-slate-100 rounded-md"
+                            >
+                              <span className="inline-flex items-center gap-3">
                                 <User size={16} /> Profil Toko
-                              </a>
+                              </span>
                             </Link>
                           </>
                         )}
@@ -228,17 +226,19 @@ const Navbar = () => {
               </div>
             ) : (
               <div className="flex items-center gap-3">
-                <Link href="/daftar-penjual" legacyBehavior>
-                  <a className="text-sm font-medium bg-white text-blue-600 border border-blue-600 px-4 py-2 rounded-lg shadow-sm hover:bg-blue-50">
-                    Mulai Berjualan
-                  </a>
+                <Link
+                  href="/daftar-penjual"
+                  className="text-sm font-medium bg-white text-blue-600 border border-blue-600 px-4 py-2 rounded-lg shadow-sm hover:bg-blue-50"
+                >
+                  Mulai Berjualan
                 </Link>
-                <Link href="/login" legacyBehavior>
-                  <a className="text-sm font-medium bg-blue-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-blue-700">
-                    <span className="flex items-center gap-2">
-                      <LogIn size={16} /> Login
-                    </span>
-                  </a>
+                <Link
+                  href="/login"
+                  className="text-sm font-medium bg-blue-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-blue-700"
+                >
+                  <span className="flex items-center gap-2">
+                    <LogIn size={16} /> Login
+                  </span>
                 </Link>
               </div>
             )}
@@ -307,13 +307,14 @@ const Navbar = () => {
                         )}
                         {userRole === 'admin' && (
                           <motion.div variants={mobileLinkVariants}>
-                            <Link href="/admin/dashboard" legacyBehavior>
-                              <a
-                                className="flex items-center gap-3 text-lg font-bold text-yellow-600 pl-5 py-2"
-                                onClick={() => setIsOpen(false)}
-                              >
+                            <Link
+                              href="/admin/dashboard"
+                              onClick={() => setIsOpen(false)}
+                              className="flex items-center gap-3 text-lg font-bold text-yellow-600 pl-5 py-2"
+                            >
+                              <span className="inline-flex items-center gap-3">
                                 <ShieldCheck size={20} /> Admin Panel
-                              </a>
+                              </span>
                             </Link>
                           </motion.div>
                         )}
@@ -326,21 +327,19 @@ const Navbar = () => {
                       </>
                     ) : (
                       <motion.div variants={mobileLinkVariants} className="mt-6 flex flex-col gap-4">
-                        <Link href="/daftar-penjual" legacyBehavior>
-                          <a
-                            onClick={() => setIsOpen(false)}
-                            className="flex items-center justify-center gap-3 w-full bg-white text-blue-600 border border-blue-600 font-semibold py-3 rounded-lg shadow-sm hover:bg-blue-50"
-                          >
-                            <ShoppingBag size={20} /> Mulai Berjualan
-                          </a>
+                        <Link
+                          href="/daftar-penjual"
+                          onClick={() => setIsOpen(false)}
+                          className="flex items-center justify-center gap-3 w-full bg-white text-blue-600 border border-blue-600 font-semibold py-3 rounded-lg shadow-sm hover:bg-blue-50"
+                        >
+                          <ShoppingBag size={20} /> Mulai Berjualan
                         </Link>
-                        <Link href="/login" legacyBehavior>
-                          <a
-                            onClick={() => setIsOpen(false)}
-                            className="flex items-center justify-center gap-3 w-full bg-blue-600 text-white font-semibold py-3 rounded-lg shadow-sm hover:bg-blue-700"
-                          >
-                            <LogIn size={20} /> Login
-                          </a>
+                        <Link
+                          href="/login"
+                          onClick={() => setIsOpen(false)}
+                          className="flex items-center justify-center gap-3 w-full bg-blue-600 text-white font-semibold py-3 rounded-lg shadow-sm hover:bg-blue-700"
+                        >
+                          <LogIn size={20} /> Login
                         </Link>
                       </motion.div>
                     )}

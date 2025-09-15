@@ -134,7 +134,7 @@ const ProductCard = ({ product, variants, variant = 'default', isClickable = tru
           className="group block h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-xl"
           aria-label={`Lihat produk ${product.name}`}
         >
-          {body}
+          <span className="block">{body}</span>
         </Link>
       ) : (
         <div className="group h-full">{body}</div>

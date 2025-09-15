@@ -80,7 +80,6 @@ const HomePage: NextPage<HomePageProps> = ({ products }) => {
           content="Membantu UMKM mendaftarkan produk, mendapatkan ulasan, dan mengakses program pelatihan."
         />
       </Head>
-
       <main>
         {/* Hero Section */}
         <section className="relative overflow-hidden">

@@ -241,7 +241,6 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({
         <title>{`${product.name} - Si-UMKM`}</title>
         <meta name="description" content={product.description} />
       </Head>
-
       <motion.div
         className="container mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-10"
         initial={{ opacity: 0 }}
@@ -276,26 +275,29 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({
           {/* KANAN: INFO */}
           <aside className="w-full">
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
-              <Link
-                href={`/toko/${product.ownerId}`}
-                className="font-semibold text-blue-600 hover:underline"
-              >
-                {product.shopName}
-              </Link>
-              {product.category && (
-                <>
-                  <span className="text-slate-400">•</span>
-                  <Link
-                    href={backToStoreHref}
-                    className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] text-gray-600 hover:bg-slate-50"
-                    title="Lihat kategori ini di toko"
-                  >
-                    <Tag size={11} />
-                    {product.category}
-                  </Link>
-                </>
-              )}
-            </div>
+  <Link
+    href={`/toko/${product.ownerId}`}
+    className="font-semibold text-blue-600 hover:underline"
+  >
+    <span>{product.shopName}</span>
+  </Link>
+
+  {product.category && (
+    <>
+      <span className="text-slate-400">•</span>
+      <Link
+        href={backToStoreHref}
+        className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] text-gray-600 hover:bg-slate-50"
+        title="Lihat kategori ini di toko"
+      >
+        <span className="inline-flex items-center gap-1">
+          <Tag size={11} />
+          <span>{product.category}</span>
+        </span>
+      </Link>
+    </>
+  )}
+</div>
 
             <h1 className="mt-1 text-2xl font-bold text-slate-900">{product.name}</h1>
             <p className="mt-2 text-xl font-semibold text-slate-900">
@@ -499,7 +501,6 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({
           </div>
         </section>
       </motion.div>
-
       {/* === Modal Laporkan Produk === */}
       {openReport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -543,7 +544,6 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({
           </div>
         </div>
       )}
-
       {/* === Sticky CTA WhatsApp (mobile only) === */}
       {wa && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/70 md:hidden">

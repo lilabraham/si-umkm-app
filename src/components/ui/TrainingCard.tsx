@@ -23,7 +23,6 @@ const TrainingCard = ({ training, variants }: TrainingCardProps) => {
       whileTap={{ scale: 0.98 }}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
     >
-      
       {/* Konten kartu tidak berubah */}
       <h3 className="text-xl font-semibold text-slate-800 mb-3">
         {training.title}

@@ -1,4 +1,3 @@
-// LOKASI FILE: src/components/common/Breadcrumb.tsx
 import Link from 'next/link';
 
 export interface CrumbItem {
@@ -24,7 +23,7 @@ const Breadcrumb = ({ items, className = '' }: BreadcrumbProps) => {
                   href={item.href}
                   className="hover:text-slate-700 hover:underline transition-colors"
                 >
-                  {item.label}
+                  <span>{item.label}</span>
                 </Link>
               ) : (
                 <span className="text-slate-700 font-medium">{item.label}</span>
