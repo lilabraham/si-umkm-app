@@ -86,7 +86,7 @@ const HomePage: NextPage<HomePageProps> = ({ products }) => {
   {/* Background foto + overlay halus */}
   <div className="absolute inset-0">
     <img
-      src="/images/umkm-market.jpg" /* ganti fotomu */
+      src="/images/orangjualan.jpg" /* ganti fotomu */
       alt="Pasar UMKM"
       className="w-full h-full object-cover"
     />

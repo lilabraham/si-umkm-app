@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import { useAuth } from '@/context/AuthContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { LayoutDashboard, Users, ShoppingCart,  Inbox,Tags,GraduationCap, LogOut, Home } from 'lucide-react';
+import { LayoutDashboard, Users, ShoppingCart,  Inbox,Tags,GraduationCap, LogOut, Home, Plus } from 'lucide-react';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -21,6 +21,9 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
     { name: 'Trainings', href: '/admin/pelatihan', icon: GraduationCap },
     { name: 'Moderasi', href: '/admin/moderasi', icon: Inbox },
     { name: 'Kategori', href: '/admin/kategori', icon: Tags },
+    { name: 'Tambah Produk', href: '/admin/tambah-produk', icon: Plus },
+    { name: 'Chat', href: '/admin/chat', icon: Inbox },
+
   ];
 
   const handleLogout = async () => {

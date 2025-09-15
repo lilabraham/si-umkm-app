@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import { useAuth } from '@/context/AuthContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { ShoppingCart, User, LogOut, Home } from 'lucide-react';
+import { ShoppingCart, User, LogOut, Home, Mail } from 'lucide-react';
 
 interface SellerLayoutProps {
   children: ReactNode;
@@ -17,6 +17,8 @@ const SellerLayout = ({ children }: SellerLayoutProps) => {
   const sidebarLinks = [
     { name: 'Manajemen Produk', href: '/dashboard', icon: ShoppingCart },
     { name: 'Profil Toko', href: '/dashboard/profil', icon: User },
+    { name: 'Chat', href: '/dashboard/chat', icon: Mail }, 
+
   ];
   
   const handleLogout = async () => {
