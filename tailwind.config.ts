@@ -1,6 +1,15 @@
 // tailwind.config.js
 
 /** @type {import('tailwindcss').Config} */
+const plugins = [];
+
+// ✅ selalu coba aktifkan aspect-ratio (kamu sudah pakai)
+try { plugins.push(require('@tailwindcss/aspect-ratio')); } catch {}
+
+// ✅ opsional: aktif kalau paketnya terpasang (tidak bikin error kalau belum ada)
+try { plugins.push(require('@tailwindcss/forms')); } catch {}
+try { plugins.push(require('@tailwindcss/typography')); } catch {}
+
 module.exports = {
   darkMode: 'class',
   content: [
@@ -11,7 +20,5 @@ module.exports = {
   theme: {
     extend: {},
   },
-  plugins: [
-    require('@tailwindcss/aspect-ratio'), // <-- TAMBAHKAN BARIS INI
-  ],
+  plugins,
 };

@@ -137,7 +137,6 @@ const Navbar = () => {
           <div className="hidden md:flex items-center gap-6">
             <NavLink href="/">Home</NavLink>
             <NavLink href="/produk/produk">Produk</NavLink>
-            <NavLink href="/pelatihan">Pelatihan</NavLink>
 
             {currentUser && userRole === 'penjual' && <NavLink href="/dashboard">Dashboard</NavLink>}
             {currentUser && userRole === 'admin' && (

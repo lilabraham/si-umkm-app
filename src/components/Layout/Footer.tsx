@@ -18,7 +18,6 @@ const Footer = () => {
   const navLinks = [
     { name: 'Beranda', href: '/' },
     { name: 'Produk', href: '/produk' },
-    { name: 'Pelatihan', href: '/pelatihan' },
     { name: 'Tentang Kami', href: '/tentang' },
   ];
 
@@ -34,7 +33,6 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
           {/* Kolom 1: Branding */}
           <div className="md:col-span-2 lg:col-span-2">
-            // ✅ Benar (satu child saja: <span>…</span>)
 <Link href="/" className="mb-4">
   <span className="flex items-center gap-3">
     <div className="bg-white/10 p-2 rounded-lg">

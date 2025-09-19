@@ -1,175 +1,133 @@
 // LOKASI FILE: src/pages/admin/dashboard.tsx
 import type { GetServerSideProps, NextPage } from 'next';
+import Link from 'next/link';
+import Head from 'next/head';
+import nookies from 'nookies';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { motion } from 'framer-motion';
-import Link from 'next/link';
-import { Users, ShoppingCart, BookOpen, Clock, ChevronRight, Inbox } from 'lucide-react';
-import nookies from 'nookies';
+import { Users, ShoppingCart, Tags, Download } from 'lucide-react';
+import StatCard from '@/components/ui/StatCard';
 
-type MiniTraining = { id: string; title: string; schedule?: string; location?: string };
-type MiniUser = { uid: string; displayName?: string; shopName?: string; email?: string };
+type CategoryStat = { category: string; count: number };
 
 interface DashboardProps {
   counts: {
     sellers: number;
     products: number;
-    trainings: number;
-    pendingSellers: number;
+    categories: number;
   };
-  recentTrainings: MiniTraining[];
-  recentPending: MiniUser[];
+  perCategory: CategoryStat[];
 }
 
-const AdminDashboardPage: NextPage<DashboardProps> = ({ counts, recentTrainings, recentPending }) => {
+const AdminDashboardPage: NextPage<DashboardProps> = ({ counts, perCategory }) => {
+  const exportTo = (href: string) => window.open(href, '_blank');
+
   return (
     <AdminLayout>
-      <div className="p-6 lg:p-10">
+      <Head><title>Dashboard Admin - SI-UMKM</title></Head>
+
+      <div className="p-6 lg:p-10 max-w-7xl mx-auto">
         <motion.div
           className="mb-8"
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600 mt-1">Ringkasan sistem & tindakan cepat.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
+          <p className="text-slate-500 mt-1 text-sm">Ringkasan data inti dan export.</p>
         </motion.div>
 
         {/* Kartu metrik */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <motion.div
-            className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
-            whileHover={{ y: -2 }}
-          >
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-500">UMKM Aktif</p>
-              <Users className="text-blue-600" size={18} />
-            </div>
-            <p className="text-2xl font-extrabold text-gray-900 mt-1">{counts.sellers}</p>
-          </motion.div>
-
-          <motion.div
-            className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
-            whileHover={{ y: -2 }}
-          >
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-500">Produk Aktif</p>
-              <ShoppingCart className="text-emerald-600" size={18} />
-            </div>
-            <p className="text-2xl font-extrabold text-gray-900 mt-1">{counts.products}</p>
-          </motion.div>
-
-          <motion.div
-            className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
-            whileHover={{ y: -2 }}
-          >
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-500">Pelatihan Terjadwal</p>
-              <BookOpen className="text-amber-600" size={18} />
-            </div>
-            <p className="text-2xl font-extrabold text-gray-900 mt-1">{counts.trainings}</p>
-          </motion.div>
-
-          <motion.div
-            className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
-            whileHover={{ y: -2 }}
-          >
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-500">Menunggu Persetujuan</p>
-              <Clock className="text-rose-600" size={18} />
-            </div>
-            <p className="text-2xl font-extrabold text-gray-900 mt-1">{counts.pendingSellers}</p>
-          </motion.div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          <StatCard
+            icon={<Users size={18} />}
+            label="UMKM Aktif"
+            value={counts.sellers}
+            accent="blue"
+          />
+          <StatCard
+            icon={<ShoppingCart size={18} />}
+            label="Produk Aktif"
+            value={counts.products}
+            accent="emerald"
+          />
+          <StatCard
+            icon={<Tags size={18} />}
+            label="Kategori"
+            value={counts.categories}
+            accent="amber"
+          />
         </div>
 
-        {/* Dua kolom: pending approvals & pelatihan terdekat */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <motion.div
-            className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow"
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <div className="flex items-center justify-between p-4 border-b border-gray-100">
-  <h2 className="font-semibold text-gray-800">Pendaftaran Penjual Baru</h2>
-  <Link
-    href="/admin/persetujuan"
-    className="text-sm text-blue-600 hover:underline"
-  >
-    <span className="flex items-center gap-1">
-      Lihat semua <ChevronRight size={16} />
-    </span>
-  </Link>
-</div>
-            {recentPending.length > 0 ? (
-              <ul className="divide-y divide-gray-100">
-                {recentPending.map((u) => (
-                  <li key={u.uid} className="p-4">
-                    <p className="font-medium text-gray-800">{u.displayName || u.email || 'Tanpa nama'}</p>
-                    <p className="text-sm text-gray-500">{u.shopName || '-'}</p>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="p-8 text-center text-gray-500">
-                <Inbox className="mx-auto mb-2 text-gray-400" />
-                Tidak ada yang pending.
-              </div>
-            )}
-          </motion.div>
+        {/* Rekap Produk per Kategori + Export */}
+        <div className="bg-white border rounded-2xl shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 p-4 border-b">
+            <h2 className="font-semibold text-slate-800">Produk per Kategori</h2>
 
-          <motion.div
-            className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow"
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <div className="flex items-center justify-between p-4 border-b border-gray-100">
-  <h2 className="font-semibold text-gray-800">Pelatihan Terbaru</h2>
-  <Link
-    href="/admin/pelatihan"
-    className="text-sm text-blue-600 hover:underline"
-  >
-    <span className="flex items-center gap-1">
-      Kelola pelatihan <ChevronRight size={16} />
-    </span>
-  </Link>
-</div>
-            {recentTrainings.length > 0 ? (
-              <ul className="divide-y divide-gray-100">
-                {recentTrainings.map((t) => (
-                  <li key={t.id} className="p-4">
-                    <p className="font-medium text-gray-800">{t.title}</p>
-                    <p className="text-sm text-gray-500">
-                      {t.schedule || '-'} • {t.location || '-'}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="p-8 text-center text-gray-500">
-                <Inbox className="mx-auto mb-2 text-gray-400" />
-                Belum ada jadwal.
-              </div>
-            )}
-          </motion.div>
+            {/* Tombol Export */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => exportTo('/api/admin/export-products-csv')}
+                className="inline-flex items-center gap-1.5 rounded-md border border-blue-600 bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                title="Export semua produk (CSV)"
+              >
+                <Download size={14} /> Export Produk
+              </button>
+
+              <button
+                onClick={() => exportTo('/api/toko/export-shops-csv')}
+                className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                title="Export data toko/penjual (CSV)"
+              >
+                <Download size={14} /> Export Toko
+              </button>
+
+              <button
+                onClick={() => exportTo('/api/export-categories-csv')}
+                className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                title="Export data kategori (CSV)"
+              >
+                <Download size={14} /> Export Kategori
+              </button>
+            </div>
+          </div>
+
+          {perCategory.length ? (
+            <div className="overflow-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-50 text-slate-600 sticky top-0 z-10">
+                  <tr>
+                    <th className="text-left px-4 py-2 border-b">Kategori</th>
+                    <th className="text-right px-4 py-2 border-b">Jumlah Produk</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {perCategory.map((row) => (
+                    <tr key={row.category || '—'} className="hover:bg-slate-50">
+                      <td className="px-4 py-2">{row.category || '—'}</td>
+                      <td className="px-4 py-2 text-right font-semibold tabular-nums">{row.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="p-10 text-center text-slate-500">Belum ada data.</div>
+          )}
         </div>
 
-        {/* Quick actions */}
+        {/* Aksi cepat */}
         <div className="mt-8 flex flex-wrap gap-3">
-          <Link
-            href="/admin/pelatihan"
-            className="px-4 py-2 rounded-md bg-blue-600 text-white font-semibold hover:bg-blue-700"
-          >
-            Tambah Pelatihan
-          </Link>
-          <Link
-            href="/admin/persetujuan"
-            className="px-4 py-2 rounded-md bg-slate-200 text-slate-800 font-semibold hover:bg-slate-300"
-          >
-            Kelola Persetujuan
-          </Link>
           <Link
             href="/admin/produk"
             className="px-4 py-2 rounded-md bg-emerald-600 text-white font-semibold hover:bg-emerald-700"
           >
             Kelola Produk
+          </Link>
+          <Link
+            href="/admin/kategori"
+            className="px-4 py-2 rounded-md bg-slate-200 text-slate-800 font-semibold hover:bg-slate-300"
+          >
+            Kelola Kategori
           </Link>
         </div>
       </div>
@@ -179,15 +137,12 @@ const AdminDashboardPage: NextPage<DashboardProps> = ({ counts, recentTrainings,
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
   try {
-    // 🔒 server-only import agar Admin SDK tidak ter-bundle ke klien
-    const { getAuth, getFirestore } = await import('@/lib/firebaseAdmin');
-
     const cookies = nookies.get(context);
     const tokenStr = cookies.token || '';
 
+    const { getAuth, getFirestore } = await import('@/lib/firebaseAdmin'); // server-only
     const adminAuth = getAuth();
     const db = getFirestore();
-
     const decoded = await adminAuth.verifyIdToken(tokenStr);
 
     const userDoc = await db.collection('users').doc(decoded.uid).get();
@@ -195,52 +150,30 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       return { redirect: { destination: '/', permanent: false } };
     }
 
-    const [
-      sellersSnap,
-      pendingSnap,
-      productsSnap,
-      trainingsSnap,
-      recentTrainingsSnap,
-      recentPendingSnap,
-    ] = await Promise.all([
+    // Ambil sellers, products, categories
+    const [sellersSnap, productsSnap, categoriesSnap] = await Promise.all([
       db.collection('users').where('role', '==', 'penjual').get(),
-      db.collection('users').where('role', '==', 'pending_penjual').get(),
-      db.collection('products').get(),
-      db.collection('trainings').get(),
-      db.collection('trainings').orderBy('createdAt', 'desc').limit(3).get(),
-      db.collection('users').where('role', '==', 'pending_penjual').limit(5).get(),
+      db.collection('products').where('visibility', '==', 'public').get(),
+      db.collection('categories').get(),
     ]);
+
+    // Hitung produk per kategori (simple in-memory)
+    const perCatMap = new Map<string, number>();
+    productsSnap.forEach((d) => {
+      const cat = (d.data()?.category || '').toString();
+      perCatMap.set(cat, (perCatMap.get(cat) || 0) + 1);
+    });
+    const perCategory = Array.from(perCatMap.entries())
+      .map(([category, count]) => ({ category, count }))
+      .sort((a, b) => b.count - a.count);
 
     const counts = {
       sellers: sellersSnap.size,
       products: productsSnap.size,
-      trainings: trainingsSnap.size,
-      pendingSellers: pendingSnap.size,
+      categories: categoriesSnap.size,
     };
 
-    const recentTrainings: MiniTraining[] = recentTrainingsSnap.docs.map((d) => {
-      const data = d.data() as any;
-      return {
-        id: d.id,
-        title: data?.title || '',
-        schedule: data?.schedule || '',
-        location: data?.location || '',
-      };
-    });
-
-    const recentPending: MiniUser[] = recentPendingSnap.docs.map((d) => {
-      const data = d.data() as any;
-      return {
-        uid: d.id,
-        displayName: data?.displayName || '',
-        shopName: data?.shopName || '',
-        email: data?.email || '',
-      };
-    });
-
-    return {
-      props: { counts, recentTrainings, recentPending },
-    };
+    return { props: { counts, perCategory } };
   } catch {
     return { redirect: { destination: '/login', permanent: false } };
   }

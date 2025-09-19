@@ -4,11 +4,8 @@ import Head from 'next/head';
 import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { useState, FormEvent, useMemo } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { Tag, MessageSquare } from 'lucide-react';
 import Breadcrumb from '@/components/common/Breadcrumb';
-import { Star, MessageSquare, Send, UserCircle, Tag, ChevronDown, Loader2 } from 'lucide-react';
-import { reportProduct } from '@/lib/report';
 
 interface Product {
   id: string;
@@ -21,164 +18,16 @@ interface Product {
   category?: string;
 }
 
-interface Review {
-  id: string;
-  userId: string; // penting untuk deteksi double review
-  userName: string;
-  rating: number;
-  comment: string;
-  createdAt: { seconds: number; nanoseconds: number } | null;
-}
-
 interface Seller {
   whatsapp: string;
 }
 
 interface ProductDetailPageProps {
   product: Product | null;
-  initialReviews: Review[];
   seller: Seller | null;
 }
 
-const StarRating = ({ rating, size = 14 }: { rating: number; size?: number }) => (
-  <div className="flex items-center">
-    {[...Array(5)].map((_, i) => (
-      <Star
-        key={i}
-        size={size}
-        className={i < Math.round(rating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}
-      />
-    ))}
-  </div>
-);
-
-const formatDate = (ts: Review['createdAt']) => {
-  if (!ts || typeof ts.seconds !== 'number') return '';
-  const d = new Date(ts.seconds * 1000);
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-};
-
-type SortKey = 'suggested' | 'recent' | 'highest' | 'lowest';
-
-const ProductDetailPage: NextPage<ProductDetailPageProps> = ({
-  product,
-  initialReviews,
-  seller,
-}) => {
-  const { currentUser, userRole } = useAuth();
-
-  const [reviews, setReviews] = useState<Review[]>(initialReviews);
-  const [rating, setRating] = useState(0);
-  const [comment, setComment] = useState('');
-  const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [sortKey, setSortKey] = useState<SortKey>('suggested');
-  const [openSort, setOpenSort] = useState(false);
-
-  // === state & handler laporan ===
-  const [openReport, setOpenReport] = useState(false);
-  const [reportReason, setReportReason] = useState('');
-  const [submittingReport, setSubmittingReport] = useState(false);
-  const [reportMsg, setReportMsg] = useState('');
-
-  // === aturan review (UI guard) ===
-  const alreadyReviewed = useMemo(
-    () => !!currentUser && reviews.some((r) => r.userId === currentUser.uid),
-    [reviews, currentUser]
-  );
-
-  const canReview =
-    !!currentUser &&
-    userRole !== 'admin' &&
-    currentUser.uid !== product?.ownerId &&
-    !alreadyReviewed;
-
-  const handleReviewSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!product) return;
-    if (!currentUser) {
-      setMessage('Anda harus login untuk memberikan ulasan.');
-      return;
-    }
-    if (rating === 0 || !comment.trim()) {
-      setMessage('Rating dan komentar wajib diisi.');
-      return;
-    }
-
-    setLoading(true);
-    setMessage('');
-    try {
-      const idToken = await currentUser.getIdToken();
-
-      const res = await fetch('/api/reviews', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({
-          productId: product.id,
-          userId: currentUser.uid, // server memverifikasi harus cocok dengan token
-          userName: currentUser.displayName || 'Pengguna Terdaftar',
-          rating,
-          comment,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.message || 'Gagal mengirim ulasan.');
-      }
-
-      const newReview: Review = await res.json();
-      if (!newReview.createdAt) {
-        newReview.createdAt = {
-          seconds: Math.floor(Date.now() / 1000),
-          nanoseconds: 0,
-        };
-      }
-
-      setReviews((prev) =>
-        [newReview, ...prev].sort(
-          (a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)
-        )
-      );
-      setRating(0);
-      setComment('');
-      setShowForm(false);
-    } catch (err: any) {
-      setMessage(err.message || 'Terjadi kesalahan.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // rata-rata rating
-  const { averageRating, totalReviews } = useMemo(() => {
-    if (!reviews.length) return { averageRating: 0, totalReviews: 0 };
-    const total = reviews.reduce((acc, r) => acc + r.rating, 0);
-    return { averageRating: total / reviews.length, totalReviews: reviews.length };
-  }, [reviews]);
-
-  // sort ulasan
-  const sortedReviews = useMemo(() => {
-    const copy = [...reviews];
-    switch (sortKey) {
-      case 'recent':
-      case 'suggested':
-        return copy.sort(
-          (a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)
-        );
-      case 'highest':
-        return copy.sort((a, b) => b.rating - a.rating);
-      case 'lowest':
-        return copy.sort((a, b) => a.rating - b.rating);
-      default:
-        return copy;
-    }
-  }, [reviews, sortKey]);
-
+const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, seller }) => {
   if (!product || !seller) {
     return (
       <div className="text-center py-20">
@@ -186,47 +35,10 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({
       </div>
     );
   }
-  
-  // guard report (hanya pembeli non-owner, non-admin)
-  const canReport =
-    !!currentUser &&
-    userRole !== 'admin' &&
-    currentUser.uid !== product.ownerId;
-
-  const submitReport = async () => {
-    if (!reportReason.trim()) {
-      setReportMsg('Alasan wajib diisi.');
-      return;
-    }
-    try {
-      setSubmittingReport(true);
-      setReportMsg('');
-      const token = await currentUser!.getIdToken();
-      const res = await fetch('/api/report', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ productId: product.id, reason: reportReason }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || 'Gagal mengirim laporan.');
-      // sukses
-      setOpenReport(false);
-      setReportReason('');
-    } catch (e: any) {
-      setReportMsg(e?.message || 'Gagal mengirim laporan.');
-    } finally {
-      setSubmittingReport(false);
-    }
-  };
 
   const wa = seller.whatsapp
     ? `https://wa.me/${
-        seller.whatsapp.startsWith('0')
-          ? '62' + seller.whatsapp.slice(1)
-          : seller.whatsapp
+        seller.whatsapp.startsWith('0') ? '62' + seller.whatsapp.slice(1) : seller.whatsapp
       }`
     : '';
 
@@ -241,6 +53,7 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({
         <title>{`${product.name} - Si-UMKM`}</title>
         <meta name="description" content={product.description} />
       </Head>
+
       <motion.div
         className="container mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-10"
         initial={{ opacity: 0 }}
@@ -256,9 +69,9 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({
           className="mb-4"
         />
 
-        {/* ================== HERO ================== */}
+        {/* === HERO === */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-          {/* KIRI: GAMBAR */}
+          {/* Kiri: Gambar */}
           <section className="w-full">
             <div className="relative aspect-[5/4] w-full overflow-hidden rounded-lg shadow-sm">
               <Image
@@ -272,32 +85,31 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({
             </div>
           </section>
 
-          {/* KANAN: INFO */}
+          {/* Kanan: Info */}
           <aside className="w-full">
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
-  <Link
-    href={`/toko/${product.ownerId}`}
-    className="font-semibold text-blue-600 hover:underline"
-  >
-    <span>{product.shopName}</span>
-  </Link>
+              <Link
+                href={`/toko/${product.ownerId}`}
+                className="font-semibold text-blue-600 hover:underline"
+              >
+                {product.shopName}
+              </Link>
 
-  {product.category && (
-    <>
-      <span className="text-slate-400">•</span>
-      <Link
-        href={backToStoreHref}
-        className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] text-gray-600 hover:bg-slate-50"
-        title="Lihat kategori ini di toko"
-      >
-        <span className="inline-flex items-center gap-1">
-          <Tag size={11} />
-          <span>{product.category}</span>
-        </span>
-      </Link>
-    </>
-  )}
-</div>
+              {product.category && (
+                <>
+                  <span className="text-slate-400">•</span>
+                  <Link href={backToStoreHref} className="inline-block">
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] text-gray-600 hover:bg-slate-50"
+                      title="Lihat kategori ini di toko"
+                    >
+                      <Tag size={11} />
+                      {product.category}
+                    </span>
+                  </Link>
+                </>
+              )}
+            </div>
 
             <h1 className="mt-1 text-2xl font-bold text-slate-900">{product.name}</h1>
             <p className="mt-2 text-xl font-semibold text-slate-900">
@@ -320,231 +132,11 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({
                 Hubungi Penjual via WhatsApp
               </a>
             )}
-
-            {/* Link Laporkan (hanya untuk pembeli non-owner, non-admin) */}
-            {canReport && (
-              <button
-                type="button"
-                onClick={() => setOpenReport(true)}
-                className="mt-2 block text-xs font-semibold text-red-600 hover:underline"
-              >
-                Laporkan produk
-              </button>
-            )}
           </aside>
         </div>
-
-        {/* ================== ULASAN ================== */}
-        <section className="mt-12 border-t border-slate-200 pt-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <span className="text-3xl font-bold text-slate-900">
-                {averageRating.toFixed(1)}
-              </span>
-              <div>
-                <StarRating rating={averageRating} size={16} />
-                <p className="text-xs text-slate-500">dari {totalReviews} ulasan</p>
-              </div>
-            </div>
-
-            {/* Sort kecil */}
-            <div className="relative">
-              <button
-                onClick={() => setOpenSort((s) => !s)}
-                className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs hover:bg-slate-50"
-              >
-                Sort by:{' '}
-                {sortKey === 'suggested'
-                  ? 'Suggested'
-                  : sortKey === 'recent'
-                  ? 'Most recent'
-                  : sortKey === 'highest'
-                  ? 'Highest Rating'
-                  : 'Lowest Rating'}
-                <ChevronDown size={14} />
-              </button>
-              {openSort && (
-                <div
-                  className="absolute right-0 mt-2 w-40 rounded-md border border-slate-200 bg-white shadow-md z-10"
-                  onMouseLeave={() => setOpenSort(false)}
-                >
-                  {([
-                    { key: 'suggested', label: 'Suggested' },
-                    { key: 'recent', label: 'Most recent' },
-                    { key: 'highest', label: 'Highest Rating' },
-                    { key: 'lowest', label: 'Lowest Rating' },
-                  ] as { key: SortKey; label: string }[]).map((o) => (
-                    <button
-                      key={o.key}
-                      onClick={() => {
-                        setSortKey(o.key);
-                        setOpenSort(false);
-                      }}
-                      className={`block w-full px-3 py-2 text-left text-xs hover:bg-slate-50 ${
-                        sortKey === o.key
-                          ? 'font-semibold text-slate-900'
-                          : 'text-slate-700'
-                      }`}
-                    >
-                      {o.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Trigger form ulasan (UI guard aktif) */}
-          <div className="mt-5">
-            {!currentUser ? (
-              <p className="text-xs text-slate-600">
-                <Link href="/login" className="font-semibold text-blue-600 hover:underline">
-                  Login
-                </Link>{' '}
-                untuk menulis ulasan.
-              </p>
-            ) : !canReview ? (
-              <p className="text-xs text-slate-600">
-                {userRole === 'admin'
-                  ? 'Admin tidak dapat menulis ulasan.'
-                  : currentUser.uid === product.ownerId
-                  ? 'Anda tidak dapat mengulas produk milik sendiri.'
-                  : alreadyReviewed
-                  ? 'Anda sudah pernah mengulas produk ini.'
-                  : 'Anda tidak dapat menulis ulasan.'}
-              </p>
-            ) : (
-              <>
-                <button
-                  onClick={() => setShowForm((s) => !s)}
-                  className="text-xs font-semibold text-blue-600 hover:underline"
-                >
-                  {showForm ? 'Tutup formulir' : 'Tulis ulasan'}
-                </button>
-
-                {showForm && (
-                  <form onSubmit={handleReviewSubmit} className="mt-3 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-600">Rating:</span>
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          key={star}
-                          type="button"
-                          onClick={() => setRating(star)}
-                          className="p-0.5"
-                          aria-label={`Rating ${star}`}
-                        >
-                          <Star
-                            size={16}
-                            className={
-                              rating >= star
-                                ? 'text-yellow-400 fill-yellow-400'
-                                : 'text-gray-300'
-                            }
-                          />
-                        </button>
-                      ))}
-                    </div>
-                    <textarea
-                      rows={3}
-                      value={comment}
-                      onChange={(e) => setComment(e.target.value)}
-                      placeholder="Tulis komentar Anda…"
-                      className="w-full border-b border-slate-300 bg-transparent p-1 text-sm outline-none focus:border-slate-500"
-                    />
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="submit"
-                        disabled={loading}
-                        className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
-                      >
-                        {loading ? (
-                          <Loader2 className="animate-spin" size={14} />
-                        ) : (
-                          <Send size={14} />
-                        )}
-                        Kirim
-                      </button>
-                      {message && <span className="text-xs text-red-500">{message}</span>}
-                    </div>
-                  </form>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Daftar ulasan */}
-          <div className="mt-6 divide-y divide-slate-200">
-            {sortedReviews.length ? (
-              sortedReviews.map((r) => (
-                <div key={r.id} className="py-4">
-                  <div className="flex items-start gap-3">
-                    <UserCircle className="h-8 w-8 text-slate-400" />
-                    <div className="flex-1">
-                      <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <span className="font-semibold text-slate-800">{r.userName}</span>
-                        <span className="text-slate-300">•</span>
-                        <StarRating rating={r.rating} size={12} />
-                        <span className="text-slate-300">•</span>
-                        <span className="text-slate-500">{formatDate(r.createdAt)}</span>
-                      </div>
-                      <p className="mt-2 text-sm text-slate-800">{r.comment}</p>
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="py-10 text-center text-sm text-slate-500">
-                Belum ada ulasan untuk produk ini.
-              </p>
-            )}
-          </div>
-        </section>
       </motion.div>
-      {/* === Modal Laporkan Produk === */}
-      {openReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-lg">
-            <h3 className="text-base font-semibold text-slate-900">Laporkan produk</h3>
-            <p className="mt-1 text-xs text-slate-600">
-              Jelaskan singkat alasan laporan Anda. Laporan akan ditinjau admin.
-            </p>
 
-            <textarea
-              rows={4}
-              className="mt-3 w-full rounded-md border border-slate-300 p-2 text-sm outline-none focus:border-slate-400"
-              placeholder="Tulis alasan…"
-              value={reportReason}
-              onChange={(e) => setReportReason(e.target.value)}
-            />
-
-            {reportMsg && <p className="mt-2 text-xs text-red-600">{reportMsg}</p>}
-
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setOpenReport(false);
-                  setReportReason('');
-                  setReportMsg('');
-                }}
-                className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={submitReport}
-                disabled={submittingReport}
-                className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-              >
-                {submittingReport ? 'Mengirim…' : 'Kirim Laporan'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* === Sticky CTA WhatsApp (mobile only) === */}
+      {/* Sticky CTA WhatsApp (mobile only) */}
       {wa && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/70 md:hidden">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
@@ -612,16 +204,9 @@ export const getStaticProps: GetStaticProps = async (ctx) => {
       whatsapp: (sellerDoc.exists && sellerDoc.data()?.whatsapp) || '',
     };
 
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-    const reviewsRes = await fetch(`${baseUrl}/api/reviews?productId=${product.id}`);
-    const initialReviews: Review[] = reviewsRes.ok ? await reviewsRes.json() : [];
-
     return {
       props: {
         product: JSON.parse(JSON.stringify(product)),
-        initialReviews: initialReviews.sort(
-          (a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)
-        ),
         seller,
       },
       revalidate: 10,

@@ -17,7 +17,6 @@ const SellerLayout = ({ children }: SellerLayoutProps) => {
   const sidebarLinks = [
     { name: 'Manajemen Produk', href: '/dashboard', icon: ShoppingCart },
     { name: 'Profil Toko', href: '/dashboard/profil', icon: User },
-    { name: 'Chat', href: '/dashboard/chat', icon: Mail }, 
 
   ];
   
