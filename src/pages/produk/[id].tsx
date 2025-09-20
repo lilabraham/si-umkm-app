@@ -5,6 +5,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Tag, MessageSquare } from 'lucide-react';
+import { useRouter } from 'next/router';
+import { useAuth } from '@/context/AuthContext';
 import Breadcrumb from '@/components/common/Breadcrumb';
 
 interface Product {
@@ -28,6 +30,9 @@ interface ProductDetailPageProps {
 }
 
 const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, seller }) => {
+  const router = useRouter();
+  const { currentUser } = useAuth();
+
   if (!product || !seller) {
     return (
       <div className="text-center py-20">
@@ -36,16 +41,33 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, seller }
     );
   }
 
-  const wa = seller.whatsapp
-    ? `https://wa.me/${
-        seller.whatsapp.startsWith('0') ? '62' + seller.whatsapp.slice(1) : seller.whatsapp
-      }`
+  // Normalisasi nomor WA -> wa.me/62xxxxxxxx
+  const waNumber = seller.whatsapp
+    ? (() => {
+        let p = seller.whatsapp.trim();
+        if (p.startsWith('+')) p = p.substring(1);
+        if (p.startsWith('0')) p = '62' + p.slice(1);
+        return p;
+      })()
     : '';
+
+  const wa = waNumber ? `https://wa.me/${waNumber}` : '';
 
   const backToStoreHref =
     product.category && product.category !== ''
       ? { pathname: `/toko/${product.ownerId}`, query: { kategori: product.category } }
       : { pathname: `/toko/${product.ownerId}` };
+
+  // Handler seragam: jika belum login -> ke /login?next=..., jika sudah -> buka WA
+  const handleContact = () => {
+    if (!wa) return;
+    if (!currentUser) {
+      const next = encodeURIComponent(router.asPath || `/produk/${product.id}`);
+      router.push(`/login?next=${next}`);
+      return;
+    }
+    window.open(wa, '_blank', 'noopener,noreferrer');
+  };
 
   return (
     <div className="bg-[#F8FAFC] min-h-screen">
@@ -122,15 +144,14 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, seller }
 
             {/* CTA WA */}
             {wa && (
-              <a
-                href={wa}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={handleContact}
                 className="mt-5 inline-flex items-center justify-center gap-2 rounded-md bg-green-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-green-700 transition"
               >
                 <MessageSquare size={16} />
                 Hubungi Penjual via WhatsApp
-              </a>
+              </button>
             )}
           </aside>
         </div>
@@ -147,16 +168,15 @@ const ProductDetailPage: NextPage<ProductDetailPageProps> = ({ product, seller }
               </p>
             </div>
 
-            <a
-              href={wa}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={handleContact}
               className="inline-flex items-center justify-center rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-green-700"
               aria-label="Hubungi penjual via WhatsApp"
             >
               <MessageSquare size={16} />
               <span className="ml-2">Hubungi Penjual</span>
-            </a>
+            </button>
           </div>
         </div>
       )}

@@ -10,7 +10,6 @@ import {
   CategoryCsv,
   ShopCsv,
   ProductCsv,
-  onlyPublicProducts,
   countBy,
   toFrequencyRows,
   histogram,
@@ -25,11 +24,8 @@ import {
 import FrequencyTable from "@/components/analytics/FrequencyTable";
 import BarCategoryChart from "@/components/analytics/BarCategoryChart";
 import PriceHistogram from "@/components/analytics/PriceHistogram";
-import CategoryPieChart from "@/components/analytics/CategoryPieChart";
+import CategoryDonutChart from "@/components/analytics/CategoryDonutChart";
 import PriceBoxplot from "@/components/analytics/PriceBoxplot";
-
-// Admin SDK (server-side)
-import { adminAuth, adminFirestore } from "@/lib/firebaseAdmin";
 
 /* ===================== GUARD ADMIN (SSR) ===================== */
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
@@ -39,36 +35,30 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
       return { redirect: { destination: "/login?next=/admin/analytics", permanent: false } };
     }
 
+    // Dynamic import: aman hanya di server
+    const { getAuth, getFirestore } = await import("@/lib/firebaseAdmin");
+    const adminAuth = getAuth();
+    const db = getFirestore();
+
     const decoded = await adminAuth.verifyIdToken(token);
     const uid = (decoded as any).uid as string | undefined;
     const email = (decoded as any).email as string | undefined;
 
-    let isAdmin =
-      (decoded as any).role === "admin" ||
-      (decoded as any).admin === true;
+    let isAdmin = (decoded as any).role === "admin" || (decoded as any).admin === true;
 
     if (!isAdmin && email) {
-      const allowlist = (process.env.ADMIN_EMAILS || "")
+      const allow = (process.env.ADMIN_EMAILS || "")
         .split(",")
         .map((s) => s.trim().toLowerCase())
         .filter(Boolean);
-      if (allowlist.includes(email.toLowerCase())) isAdmin = true;
+      if (allow.includes(email.toLowerCase())) isAdmin = true;
     }
 
     if (!isAdmin && uid) {
       try {
-        const userDoc = await adminFirestore.collection("users").doc(uid).get();
-        if (userDoc.exists) {
-          const data = userDoc.data() as any;
-          if (typeof data?.role === "string" && data.role.toLowerCase() === "admin") isAdmin = true;
-        }
-      } catch {}
-    }
-
-    if (!isAdmin && uid) {
-      try {
-        const admDoc = await adminFirestore.collection("admins").doc(uid).get();
-        if (admDoc.exists && (admDoc.data() as any)?.enabled === true) isAdmin = true;
+        const userDoc = await db.collection("users").doc(uid).get();
+        const role = String((userDoc.data() as any)?.role || "").toLowerCase();
+        if (role === "admin") isAdmin = true;
       } catch {}
     }
 
@@ -78,19 +68,16 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     return { redirect: { destination: "/login?next=/admin/analytics", permanent: false } };
   }
 };
-/* =================== END GUARD ADMIN (SSR) =================== */
+/* =================== END GUARD =================== */
 
-// ---------- Fetch CSV di client ----------
+/* =================== Helper =================== */
 const fetchCsv = async <T,>(url: string): Promise<T[]> => {
-  const res = await fetch(url);
+  const res = await fetch(url, { credentials: "include" });
   const text = await res.text();
   const parsed = Papa.parse<T>(text, { header: true, skipEmptyLines: true });
-  return (parsed.data as any[]).filter((r) =>
-    Object.values(r).some((v) => String(v ?? "").trim() !== "")
-  );
+  return (parsed.data as any[]).filter((r) => Object.values(r).some((v) => String(v ?? "").trim() !== ""));
 };
 
-// ---------- Fallback sample ----------
 const fallbackData = {
   categories: [
     { id: "c1", name: "Makanan" },
@@ -102,28 +89,45 @@ const fallbackData = {
     { uid: "u2", shopName: "Kedai Segar" },
   ] as ShopCsv[],
   products: [
-    { id: "p1", name: "Keripik Singkong", price: "15000", category: "c1", ownerId: "u1", visibility: "public" },
-    { id: "p2", name: "Sambal Botol", price: "20000", category: "c1", ownerId: "u1", visibility: "public" },
-    { id: "p3", name: "Es Sirup", price: "10000", category: "c2", ownerId: "u2", visibility: "public" },
-    { id: "p4", name: "Anyaman Bambu", price: "80000", category: "c3", ownerId: "u1", visibility: "public" },
+    { id: "p1", name: "Keripik Singkong", price: "15000", category: "Makanan", ownerId: "u1" },
+    { id: "p2", name: "Sambal Botol", price: "20000", category: "Makanan", ownerId: "u1" },
+    { id: "p3", name: "Es Sirup", price: "10000", category: "Minuman", ownerId: "u2" },
+    { id: "p4", name: "Anyaman Bambu", price: "80000", category: "Kerajinan", ownerId: "u1" },
   ] as ProductCsv[],
 };
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 
-const makeCategoriesMapLocal = (cats: CategoryCsv[]): Record<string, string> => {
+// normalisasi visibility: kosong → public
+const isPublic = (v: any) => {
+  const s = String(v ?? "public").trim().toLowerCase();
+  return ["public", "published", "visible", "true", "1"].includes(s);
+};
+
+// pembersih angka harga
+const toPrice = (v: any) => {
+  const num = Number(String(v ?? "").replace(/[^\d\-]/g, ""));
+  return Number.isFinite(num) ? num : NaN;
+};
+
+// peta kategori: dukung id/slug/name (case-insensitive)
+const buildCategoryMap = (cats: CategoryCsv[]) => {
   const map: Record<string, string> = {};
   cats.forEach((c) => {
-    const id = (c.id ?? "").toString().trim();
-    const name = (c.name ?? "").toString().trim();
-    const slug = (c as any)?.slug ? String((c as any).slug).trim() : "";
+    const id = String(c?.id ?? "").trim().toLowerCase();
+    const name = String(c?.name ?? "").trim();
+    const slug = String((c as any)?.slug ?? "").trim().toLowerCase();
     if (id) map[id] = name;
     if (slug) map[slug] = name;
-    if (name) map[name] = name;
+    if (name) map[name.toLowerCase()] = name;
   });
   return map;
 };
 
+// >>> TIPE LOKAL: menambahkan 'visibility' ke PublicProduct agar aman dipakai di file ini
+type ProductWithVisibility = PublicProduct & { visibility?: string | null };
+
+/* =================== Halaman =================== */
 const AnalyticsPage: NextPage = () => {
   const [state, setState] = useState<LoadState>("idle");
   const [productsRaw, setProductsRaw] = useState<ProductCsv[]>([]);
@@ -140,13 +144,13 @@ const AnalyticsPage: NextPage = () => {
           fetchCsv<ShopCsv>("/api/toko/export-shops-csv"),
           fetchCsv<CategoryCsv>("/api/export-categories-csv"),
         ]);
+
         if (!mounted) return;
 
-        // Opsi A: jika visibility tidak ada, anggap public
-        const normalizedProducts: ProductCsv[] = (p.length ? p : fallbackData.products).map((row: any) => {
-          const hasVis = row && typeof row.visibility !== "undefined" && String(row.visibility ?? "").trim() !== "";
-          return { ...row, visibility: hasVis ? row.visibility : "public" };
-        });
+        const normalizedProducts: ProductCsv[] = (p.length ? p : fallbackData.products).map((row: any) => ({
+          ...row,
+          visibility: row?.visibility ?? "public",
+        }));
 
         setProductsRaw(normalizedProducts);
         setShops(s.length ? s : fallbackData.shops);
@@ -160,32 +164,56 @@ const AnalyticsPage: NextPage = () => {
         setState("error");
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  const categoriesMap = useMemo(() => makeCategoriesMapLocal(categories), [categories]);
+  // Normalisasi kategori + transform produk
+  const categoriesMap = useMemo(() => buildCategoryMap(categories), [categories]);
 
-  const products: PublicProduct[] = useMemo(
-    () => onlyPublicProducts(productsRaw, categoriesMap),
-    [productsRaw, categoriesMap]
+  const productsAll: ProductWithVisibility[] = useMemo(() => {
+    const labelUnknown = "Tanpa Kategori";
+    const src = productsRaw.length ? productsRaw : fallbackData.products;
+    return src.map((p: any) => {
+      const catRaw = String(p?.category ?? "").trim().toLowerCase();
+      const catName = categoriesMap[catRaw] || String(p?.category ?? "").trim() || labelUnknown;
+      return {
+        id: String(p?.id ?? ""),
+        name: String(p?.name ?? ""),
+        price: toPrice(p?.price),
+        category: catName,
+        ownerId: String(p?.ownerId ?? p?.shopId ?? ""),
+        visibility: String(p?.visibility ?? "public"),
+      } as ProductWithVisibility;
+    });
+  }, [productsRaw, categoriesMap]);
+
+  // Produk dengan harga valid untuk histogram/boxplot
+  const productsWithPrice: ProductWithVisibility[] = useMemo(
+    () => productsAll.filter((p) => Number.isFinite(p.price) && p.price >= 0),
+    [productsAll]
   );
 
-  // KPI
+  /* =================== KPI =================== */
   const totalUMKM = shops.length;
-  const totalProduk = products.length;
+  const totalProduk = productsAll.filter((p) => isPublic(p.visibility)).length;
   const totalKategori = categories.length;
 
-  // Agregasi
+  /* =================== Agregasi =================== */
+  // Frekuensi per kategori: hanya produk public/kosong
   const freqRows = useMemo(() => {
-    const counts = countBy(products, (p) => p.category);
+    const publicOnly = productsAll.filter((p) => isPublic(p.visibility));
+    const counts = countBy(publicOnly, (p) => p.category);
     Object.keys(counts).forEach((k) => !counts[k] && delete counts[k]);
     return toFrequencyRows(counts);
-  }, [products]);
+  }, [productsAll]);
 
-  const bins = useMemo(() => histogram(products.map((p) => p.price), 10), [products]);
-  const boxes = useMemo(() => boxplotByCategory(products), [products]);
+  // Histogram & Boxplot: pakai harga valid
+  const bins = useMemo(() => histogram(productsWithPrice.map((p) => p.price), 10), [productsWithPrice]);
+  const boxes = useMemo(() => boxplotByCategory(productsWithPrice), [productsWithPrice]);
 
-  // Narasi ringkas
+  /* =================== Narasi =================== */
   const freqText = useMemo(() => describeFrequency(freqRows), [freqRows]);
   const barText = freqText;
   const pieText = useMemo(() => describePie(freqRows), [freqRows]);
@@ -200,108 +228,116 @@ const AnalyticsPage: NextPage = () => {
         <title>Admin Analytics | UMKM Randudongkal</title>
       </Head>
 
-      <main className="mx-auto max-w-7xl px-4 py-8 space-y-8">
+      {/* Tema terang */}
+      <main className="mx-auto max-w-[1400px] px-6 py-8 space-y-8 bg-[#F8F9FA] min-h-screen text-[#333]">
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-3xl font-bold tracking-tight">Analitik Deskriptif UMKM Randudongkal</h1>
-          <p className="text-sm text-zinc-500 mt-1">Ringkasan statistik dari data ekspor dashboard (produk, kategori, penjual).</p>
+          <h1 className="text-2xl font-bold tracking-tight">Analitik Deskriptif UMKM Randudongkal</h1>
+          <p className="text-sm text-[#333]/70 mt-1">
+            Dashboard statistik dari data ekspor admin (produk, kategori, penjual). Visual rapi untuk presentasi sidang.
+          </p>
         </motion.div>
 
         {/* KPI */}
         <section className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <KpiCard icon={Store} label="Total UMKM (Penjual)" value={totalUMKM} loading={isLoading} />
-          <KpiCard icon={Package} label="Total Produk (Public)" value={totalProduk} loading={isLoading} />
+          <KpiCard icon={Store} label="Total Sellers" value={totalUMKM} loading={isLoading} />
+          <KpiCard icon={Package} label="Total Produk (Public/Kosong)" value={totalProduk} loading={isLoading} />
           <KpiCard icon={Layers} label="Total Kategori" value={totalKategori} loading={isLoading} />
         </section>
 
-        {/* Tabel Frekuensi */}
-        <section className="space-y-2">
-          <FrequencyTable
-            title="Tabel Frekuensi Produk per Kategori"
-            subtitle="Urutan kategori dengan jumlah produk terbanyak (produk public)."
-            rows={freqRows}
-            exportName="tabel_frekuensi_kategori.csv"
-            loading={isLoading}
-          />
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{freqText}</p>
+        {/* Grid 2 kolom */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Kiri: Bar + Tabel */}
+          <div className="space-y-6">
+            <BarCategoryChart
+              title="Produk per Kategori"
+              subtitle="Batang vertikal (ujung membulat) • Sumbu-X: Kategori • Sumbu-Y: Jumlah"
+              data={freqRows}
+              exportName="bar_produk_kategori.csv"
+              loading={isLoading}
+            />
+            <FrequencyTable
+              title="Tabel Frekuensi"
+              subtitle="Diurutkan dari kategori dengan jumlah terbanyak"
+              rows={freqRows}
+              exportName="tabel_frekuensi_kategori.csv"
+              loading={isLoading}
+            />
+          </div>
+
+          {/* Kanan: Donut + Boxplot */}
+          <div className="space-y-6">
+            <CategoryDonutChart
+              title="Proporsi Produk per Kategori"
+              subtitle="Donut chart (persentase kontribusi tiap kategori)"
+              data={freqRows}
+              exportName="donut_kategori.csv"
+              loading={isLoading}
+            />
+            <PriceBoxplot
+              title="Boxplot Harga per Kategori"
+              subtitle="Ringkasan lima angka: min, Q1, median, Q3, max"
+              data={boxes}
+              exportName="boxplot_harga_kategori.csv"
+              height={380}
+              loading={isLoading}
+            />
+          </div>
         </section>
 
-        {/* Bar Chart */}
-        <section className="space-y-2">
-          <BarCategoryChart
-            title="Produk per Kategori"
-            subtitle="Sumbu-X: Kategori • Sumbu-Y: Jumlah Produk"
-            data={freqRows}
-            exportName="bar_produk_kategori.csv"
-            loading={isLoading}
-          />
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{barText}</p>
-        </section>
-
-        {/* Histogram */}
-        <section className="space-y-2">
+        {/* Histogram lebar penuh */}
+        <section>
           <PriceHistogram
-            title="Histogram Harga"
-            subtitle="Distribusi harga produk berdasarkan rentang (bin) yang sama lebar"
+            title="Distribusi Harga (Histogram)"
+            subtitle="Bin lebar sama untuk memotret sebaran harga keseluruhan"
             bins={bins}
             exportName="histogram_harga.csv"
             loading={isLoading}
           />
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{histText}</p>
         </section>
 
-        {/* Pie */}
-        <section className="space-y-2">
-          <CategoryPieChart
-            title="Proporsi Produk per Kategori"
-            subtitle="Kontribusi relatif tiap kategori terhadap total produk public"
-            data={freqRows}
-            exportName="pie_kategori.csv"
-            loading={isLoading}
-          />
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{pieText}</p>
+        {/* Narasi 2–4 kalimat */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <p className="text-sm text-[#333]/80">{barText}</p>
+          <p className="text-sm text-[#333]/80">{pieText}</p>
+          <p className="text-sm text-[#333]/80">{histText}</p>
+          <p className="text-sm text-[#333]/80">{boxText}</p>
         </section>
 
-        {/* Boxplot */}
-        <section className="space-y-2">
-          <PriceBoxplot
-            title="Boxplot Harga per Kategori"
-            subtitle="Ringkasan lima angka: minimum, Q1, median, Q3, maksimum"
-            data={boxes}
-            exportName="boxplot_harga_kategori.csv"
-            height={380}
-            loading={isLoading}
-          />
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{boxText}</p>
-        </section>
-
-        <p className="text-xs text-zinc-500">
-          Catatan: Jika kolom <code>visibility</code> tidak tersedia pada CSV, sistem menganggap semua produk bersifat publik.
+        <p className="text-xs text-[#333]/60">
+          Catatan: Produk dengan <i>visibility</i> kosong diperlakukan sebagai <b>public</b>. Harga non-numerik tidak
+          diikutkan pada histogram/boxplot agar visual tetap representatif.
         </p>
       </main>
     </>
   );
 };
 
+/* =================== Komponen kecil =================== */
 const KpiCard = ({
   label,
   value,
   icon: Icon,
   loading,
-}: { label: string; value: number | string; icon: any; loading?: boolean }) => (
+}: {
+  label: string;
+  value: number | string;
+  icon: any;
+  loading?: boolean;
+}) => (
   <motion.div
-    className="rounded-2xl bg-white dark:bg-zinc-900 ring-1 ring-zinc-200/70 dark:ring-zinc-800 shadow-sm transition hover:shadow-md p-5"
+    className="rounded-xl bg-white shadow-[0_8px_24px_rgba(0,0,0,0.06)] ring-1 ring-black/5 p-5"
     initial={{ opacity: 0, y: 6 }}
     whileInView={{ opacity: 1, y: 0 }}
     viewport={{ once: true }}
   >
-    <div className="flex items-center gap-3">
-      <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300 ring-1 ring-blue-100/70 dark:ring-blue-400/20">
-        <Icon size={18} />
+    <div className="flex items-center gap-4">
+      <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#4A90E2]/10 text-[#4A90E2] ring-1 ring-[#4A90E2]/20">
+        <Icon size={20} />
       </div>
       <div className="flex-1">
-        <div className="text-xs uppercase tracking-wide text-zinc-500">{label}</div>
+        <div className="text-[13px] font-medium tracking-wide text-[#333]/70">{label}</div>
         {loading ? (
-          <div className="mt-1 h-6 w-24 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
+          <div className="mt-1 h-7 w-28 bg-zinc-200 rounded animate-pulse" />
         ) : (
           <div className="text-2xl font-semibold mt-1">{value}</div>
         )}

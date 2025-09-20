@@ -14,25 +14,26 @@ type Props = {
 
 const PriceHistogram: React.FC<Props> = ({
   bins,
-  title = "Histogram Harga",
+  title = "Price Distribution (Histogram)",
   subtitle,
   exportName = "histogram_harga.csv",
   loading,
 }) => {
-  const chartData = bins.map((b) => ({ rentang: `Rp${formatIDR(b.binStart)}–Rp${formatIDR(b.binEnd)}`, frekuensi: b.count }));
-  const onExport = () => downloadCsv(exportName, toCsv(chartData, ["rentang", "frekuensi"]));
+  const chartData = bins.map((b) => ({ range: `Rp${formatIDR(b.binStart)}–Rp${formatIDR(b.binEnd)}`, freq: b.count }));
+  const onExport = () => downloadCsv(exportName, toCsv(chartData, ["range", "freq"]));
 
   return (
     <ChartCard title={title} subtitle={subtitle} onExport={onExport} loading={loading}>
-      <div className="h-80 text-zinc-600 dark:text-zinc-300">
+      <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 24 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.15} />
-            <XAxis dataKey="rentang" angle={-12} textAnchor="end" height={48} tick={{ fill: "currentColor" }} stroke="currentColor" />
-            <YAxis tick={{ fill: "currentColor" }} stroke="currentColor" />
+          <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 28 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,.15)" />
+            <XAxis dataKey="range" angle={-10} textAnchor="end" height={48} tick={{ fill: "#333" }} stroke="#333" />
+            <YAxis tick={{ fill: "#333" }} stroke="#333" />
             <Tooltip />
             <Legend />
-            <Bar dataKey="frekuensi" name="Frekuensi" fill="#10b981" radius={[6, 6, 0, 0]} />
+            {/* warna: teal lembut */}
+            <Bar dataKey="freq" name="Frequency" fill="#2CB1A5" radius={[8, 8, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

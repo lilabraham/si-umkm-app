@@ -12,14 +12,14 @@ type Props = {
 };
 
 const FrequencyTable: React.FC<Props> = ({
-  title = "Tabel Frekuensi",
+  title = "Frequency Table",
   subtitle,
   rows,
   exportName = "frequency.csv",
   loading,
 }) => {
   const onExport = () => {
-    const csv = toCsv(rows.map((r) => ({ kategori: r.key, jumlah: r.count })), ["kategori", "jumlah"]);
+    const csv = toCsv(rows.map((r) => ({ category: r.key, count: r.count })), ["category", "count"]);
     downloadCsv(exportName, csv);
   };
 
@@ -28,21 +28,21 @@ const FrequencyTable: React.FC<Props> = ({
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead>
-            <tr className="text-left text-zinc-600 dark:text-zinc-300">
-              <th className="px-3 py-2 font-medium">Kategori</th>
-              <th className="px-3 py-2 font-medium">Jumlah Produk</th>
+            <tr className="text-left text-[#333]/80">
+              <th className="px-3 py-2 font-medium">Category</th>
+              <th className="px-3 py-2 font-medium">Count</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          <tbody className="divide-y divide-black/5">
             {rows.map((r) => (
-              <tr key={r.key} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/50">
+              <tr key={r.key} className="hover:bg-black/[.03]">
                 <td className="px-3 py-2">{r.key}</td>
                 <td className="px-3 py-2 font-semibold">{r.count}</td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td className="px-3 py-4 text-zinc-500" colSpan={2}>Tidak ada data.</td>
+                <td className="px-3 py-4 text-[#333]/60" colSpan={2}>No data.</td>
               </tr>
             )}
           </tbody>

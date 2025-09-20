@@ -14,7 +14,7 @@ type Props = {
 
 const BarCategoryChart: React.FC<Props> = ({
   data,
-  title = "Produk per Kategori",
+  title = "Products by Category",
   subtitle,
   exportName = "bar_kategori.csv",
   loading,
@@ -24,15 +24,23 @@ const BarCategoryChart: React.FC<Props> = ({
 
   return (
     <ChartCard title={title} subtitle={subtitle} onExport={onExport} loading={loading}>
-      <div className="h-80 text-zinc-600 dark:text-zinc-300">
+      <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 24 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.15} />
-            <XAxis dataKey="kategori" angle={-12} textAnchor="end" height={48} tick={{ fill: "currentColor" }} stroke="currentColor" />
-            <YAxis tick={{ fill: "currentColor" }} stroke="currentColor" />
+          <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 28 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,.15)" />
+            <XAxis
+              dataKey="kategori"
+              angle={-10}
+              textAnchor="end"
+              height={46}
+              tick={{ fill: "#333" }}
+              stroke="#333"
+            />
+            <YAxis tick={{ fill: "#333" }} stroke="#333" />
             <Tooltip />
             <Legend />
-            <Bar dataKey="jumlah" name="Jumlah Produk" fill="#6366f1" radius={[6, 6, 0, 0]} />
+            {/* warna: soft blue */}
+            <Bar dataKey="jumlah" name="Jumlah Produk" fill="#4A90E2" radius={[8, 8, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

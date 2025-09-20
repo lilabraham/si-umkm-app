@@ -1,17 +1,25 @@
 // LOKASI FILE: src/pages/daftar-penjual.tsx
-
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-// DIUBAH: Impor 'signOut' dari firebase/auth
-import { createUserWithEmailAndPassword, updateProfile, signOut } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { motion } from 'framer-motion';
-import { AlertTriangle, CheckCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Store } from 'lucide-react';
+
+// normalisasi no WA => hanya digit; jika mulai "0" ubah ke "62"
+function normalizeWhatsapp(input: string): string {
+  const digits = (input || '').replace(/\D+/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('62')) return digits;
+  if (digits.startsWith('0')) return `62${digits.slice(1)}`;
+  return digits;
+}
 
 const DaftarPenjualPage = () => {
-  const [formData, setFormData] = useState({
+  const router = useRouter();
+  const [form, setForm] = useState({
     displayName: '',
     shopName: '',
     whatsapp: '',
@@ -19,60 +27,66 @@ const DaftarPenjualPage = () => {
     email: '',
     password: '',
   });
-  
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [ok, setOk] = useState(false);
+
+  const onChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setForm((s) => ({ ...s, [name]: value }));
+  };
+
+  const validate = () => {
+    if (!form.displayName.trim()) return 'Nama Lengkap wajib diisi.';
+    if (!form.shopName.trim()) return 'Nama Toko/Usaha wajib diisi.';
+    if (!form.whatsapp.trim()) return 'Nomor WhatsApp wajib diisi.';
+    const wa = normalizeWhatsapp(form.whatsapp);
+    if (wa.length < 10 || wa.length > 15) return 'Nomor WhatsApp tidak valid.';
+    if (!form.description.trim()) return 'Deskripsi singkat wajib diisi.';
+    if (!form.email.trim()) return 'Email wajib diisi.';
+    if (form.password.length < 6) return 'Password minimal 6 karakter.';
+    return '';
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError(null);
-    setSuccess(null);
-    setLoading(true);
+    setErr(null);
+    setOk(false);
 
-    if (formData.password.length < 6) {
-        setError("Password minimal harus 6 karakter.");
-        setLoading(false);
-        return;
+    const v = validate();
+    if (v) {
+      setErr(v);
+      return;
     }
 
+    setLoading(true);
     try {
-      // 1. Buat pengguna di Firebase Authentication
-      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-      const user = userCredential.user;
+      // 1) Buat akun Auth
+      const { user } = await createUserWithEmailAndPassword(auth, form.email, form.password);
 
-      // 2. Update profil pengguna dengan nama display (kita gunakan nama toko)
-      await updateProfile(user, { displayName: formData.shopName });
+      // 2) Set nama tampilan ke nama lengkap (agar Navbar menampilkan nama user)
+      await updateProfile(user, { displayName: form.displayName });
 
-      // 3. Simpan data aplikasi penjual ke Firestore dengan status 'pending_penjual'
-      await setDoc(doc(db, "users", user.uid), {
+      // 3) Simpan dokumen user sebagai PENJUAL
+      const whatsapp = normalizeWhatsapp(form.whatsapp);
+      await setDoc(doc(db, 'users', user.uid), {
         uid: user.uid,
         email: user.email,
-        displayName: formData.displayName,
-        shopName: formData.shopName,
-        whatsapp: formData.whatsapp,
-        description: formData.description,
-        role: 'pending_penjual',
+        displayName: form.displayName,   // nama pemilik
+        shopName: form.shopName,         // nama toko
+        whatsapp,                         // hanya digit, pref 62
+        description: form.description,
+        role: 'penjual',
+        productCount: 0,                 // penting utk kartu toko & export
         createdAt: serverTimestamp(),
       });
-      
-      setSuccess("Pendaftaran berhasil! Akun Anda sedang dalam peninjauan oleh Admin.");
-      
-      // ================== PERUBAHAN DI SINI ==================
-      // 4. Logout pengguna secara otomatis setelah pendaftaran berhasil
-      await signOut(auth);
-      // =======================================================
 
-    } catch (err: any) {
-      setError(err.message.replace('Firebase: ', ''));
+      setOk(true);
+      // 4) Arahkan ke dashboard penjual
+      router.push('/dashboard');
+    } catch (e: any) {
+      setErr(e?.message?.replace('Firebase: ', '') || 'Gagal mendaftar. Coba lagi.');
     } finally {
       setLoading(false);
     }
@@ -80,68 +94,156 @@ const DaftarPenjualPage = () => {
 
   return (
     <div className="bg-slate-50 flex items-center justify-center min-h-screen py-12 px-4">
-      <motion.div 
-        className="w-full max-w-lg bg-white p-8 rounded-xl shadow-lg border border-gray-200"
+      <motion.div
+        className="w-full max-w-2xl bg-white p-8 rounded-xl shadow-lg border border-gray-200"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: 'easeOut' }}
       >
-        <h1 className="text-3xl font-bold mb-2 text-center text-gray-900">Pendaftaran Penjual</h1>
-        <p className="text-center text-gray-500 mb-6">Ajukan aplikasi untuk bergabung dengan platform kami.</p>
-        
-        {!success ? (
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* ... sisa kode form tidak ada perubahan ... */}
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}>
-             <label htmlFor="displayName" className="block text-sm font-medium text-gray-700">Nama Lengkap Anda</label>
-             <input id="displayName" name="displayName" type="text" value={formData.displayName} onChange={handleChange} required className="w-full mt-1 p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Contoh: Budi Santoso"/>
-          </motion.div>
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
-            <label htmlFor="shopName" className="block text-sm font-medium text-gray-700">Nama Toko / Usaha</label>
-            <input id="shopName" name="shopName" type="text" value={formData.shopName} onChange={handleChange} required className="w-full mt-1 p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Contoh: Warung Bakso Pak Kumis" />
-          </motion.div>
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
-            <label htmlFor="whatsapp" className="block text-sm font-medium text-gray-700">Nomor WhatsApp Aktif</label>
-            <input id="whatsapp" name="whatsapp" type="tel" value={formData.whatsapp} onChange={handleChange} required className="w-full mt-1 p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Contoh: 081234567890" />
-          </motion.div>
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700">Deskripsi Singkat Usaha</label>
-            <textarea id="description" name="description" value={formData.description} onChange={handleChange} required rows={3} className="w-full mt-1 p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Jelaskan produk yang Anda jual..." />
-          </motion.div>
-          
-          <hr/>
-          
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
-            <label htmlFor="email">Email untuk Login</label>
-            <input id="email" name="email" type="email" value={formData.email} onChange={handleChange} required className="w-full mt-1 p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" />
-          </motion.div>
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}>
-            <label htmlFor="password">Password</label>
-            <input id="password" name="password" type="password" value={formData.password} onChange={handleChange} required className="w-full mt-1 p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" />
-          </motion.div>
+        <div className="flex items-center justify-center gap-2 mb-2 text-blue-600">
+          <Store className="w-6 h-6" />
+          <h1 className="text-2xl font-bold">Pendaftaran Penjual</h1>
+        </div>
+        <p className="text-center text-gray-500 mb-6">
+          Isi data berikut untuk membuka toko Anda di Si-UMKM. Semua kolom wajib diisi.
+        </p>
 
-          {error && <div className="p-3 bg-red-100 text-red-700 border border-red-200 rounded-md flex items-center gap-3 text-sm"><AlertTriangle size={18} /><span>{error}</span></div>}
-          
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }}>
-            <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white py-3 rounded-md font-bold hover:bg-blue-700 transition-colors disabled:bg-gray-400">
-              {loading ? 'Mengirim Aplikasi...' : 'Ajukan Pendaftaran'}
-            </button>
-          </motion.div>
-        </form>
+        {!ok ? (
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Nama Lengkap Anda
+              </label>
+              <input
+                name="displayName"
+                value={form.displayName}
+                onChange={onChange}
+                required
+                className="mt-1 w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                placeholder="Contoh: Budi Santoso"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Nama Toko / Usaha
+              </label>
+              <input
+                name="shopName"
+                value={form.shopName}
+                onChange={onChange}
+                required
+                className="mt-1 w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                placeholder="Contoh: Warung Bakso Pak Kumis"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Nomor WhatsApp Aktif
+              </label>
+              <input
+                name="whatsapp"
+                value={form.whatsapp}
+                onChange={onChange}
+                required
+                inputMode="tel"
+                className="mt-1 w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                placeholder="Contoh: 081234567890"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Kami simpan dalam format internasional (contoh: 62812xxxxxxx).
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Deskripsi Singkat Usaha
+              </label>
+              <textarea
+                name="description"
+                value={form.description}
+                onChange={onChange}
+                required
+                rows={3}
+                className="mt-1 w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                placeholder="Jelaskan produk/jasa utama yang Anda jual…"
+              />
+            </div>
+
+            <hr className="my-1" />
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Email untuk Login
+              </label>
+              <input
+                name="email"
+                type="email"
+                value={form.email}
+                onChange={onChange}
+                required
+                className="mt-1 w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                placeholder="email@contoh.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Password
+              </label>
+              <input
+                name="password"
+                type="password"
+                value={form.password}
+                onChange={onChange}
+                required
+                className="mt-1 w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                placeholder="Minimal 6 karakter"
+              />
+            </div>
+
+            {err && (
+              <div className="p-3 bg-red-100 text-red-700 border border-red-200 rounded-md flex items-center gap-3 text-sm">
+                <AlertTriangle className="w-5 h-5" />
+                <span>{err}</span>
+              </div>
+            )}
+
+            <motion.button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-600 text-white py-3 rounded-md font-bold hover:bg-blue-700 transition-colors disabled:bg-gray-400"
+              whileTap={{ scale: 0.98 }}
+            >
+              {loading ? 'Memproses…' : 'Daftar sebagai Penjual'}
+            </motion.button>
+
+            <p className="text-center text-sm text-gray-600">
+              Sudah punya akun?{' '}
+              <Link href="/login" className="text-blue-600 font-semibold hover:underline">
+                Login di sini
+              </Link>
+            </p>
+          </form>
         ) : (
-        <motion.div 
+          <motion.div
             className="text-center"
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-        >
+          >
             <CheckCircle className="mx-auto h-16 w-16 text-green-500" />
-            <h2 className="mt-4 text-2xl font-bold text-gray-900">Pendaftaran Terkirim!</h2>
-            <p className="mt-2 text-gray-600">{success}</p>
-            <p className="mt-2 text-gray-600">Admin akan segera meninjau aplikasi Anda. Anda akan mendapatkan notifikasi melalui email jika pendaftaran Anda disetujui.</p>
-            <Link href="/" className="mt-6 inline-block bg-blue-600 text-white font-bold px-8 py-3 rounded-md hover:bg-blue-700 transition-colors">
-                Kembali ke Halaman Utama
+            <h2 className="mt-4 text-2xl font-bold text-gray-900">Pendaftaran Berhasil!</h2>
+            <p className="mt-2 text-gray-600">
+              Akun penjual Anda sudah aktif. Anda akan diarahkan ke dashboard.
+            </p>
+            <Link
+              href="/dashboard/index"
+              className="mt-6 inline-block bg-blue-600 text-white font-bold px-8 py-3 rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Buka Dashboard Sekarang
             </Link>
-        </motion.div>
+          </motion.div>
         )}
       </motion.div>
     </div>

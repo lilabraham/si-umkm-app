@@ -2,6 +2,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import nookies from 'nookies';
 
+const normVis = (v: any) => String(v ?? 'public').trim().toLowerCase();
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const cookies = nookies.get({ req });
@@ -17,20 +19,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    // Ambil produk "public" saja untuk keperluan penyajian data
-    const snap = await db.collection('products').where('visibility', '==', 'public').get();
+    // AMBIL SEMUA PRODUK (tidak mem-filter visibility)
+    const snap = await db.collection('products').get();
 
-    // Header CSV
+    // Header CSV (lengkap & kompatibel analytics)
     const headers = [
-      'id','name','price','category','shopId','shopName','imageUrl','createdAt'
+      'id','name','price','category','ownerId','shopId','shopName','visibility','imageUrl','createdAt'
     ];
 
-    // Escape CSV helper
-    const esc = (v: any) => {
-      if (v == null) return '';
-      const s = String(v).replace(/"/g, '""');
-      return `"${s}"`;
-    };
+    const esc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
     const rows: string[] = [];
     rows.push(headers.join(','));
@@ -38,23 +35,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     snap.forEach((d) => {
       const p = d.data() as any;
       const createdAt = p.createdAt?.toDate ? p.createdAt.toDate().toISOString() : '';
+      const visibility = normVis(p.visibility); // default ke "public" bila kosong
+
       rows.push([
         esc(d.id),
         esc(p.name),
         esc(p.price),
         esc(p.category || ''),
-        esc(p.shopId || p.ownerId || ''),
+        esc(p.ownerId || ''),
+        esc(p.shopId || ''),
         esc(p.shopName || ''),
+        esc(visibility),
         esc(p.imageUrl || ''),
         esc(createdAt),
       ].join(','));
     });
 
-    const csv = rows.join('\r\n');
-
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="products_export.csv"');
-    res.status(200).send(csv);
+    res.status(200).send(rows.join('\r\n'));
   } catch (e: any) {
     res.status(500).json({ error: e?.message || 'Failed to export' });
   }
