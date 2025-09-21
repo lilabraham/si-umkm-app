@@ -259,12 +259,13 @@ const Navbar = () => {
                 ) : (
                   <div className="flex items-center gap-3">
                     <Link
-                      href="/daftar-penjual"
-                      prefetch={false}
-                      className="rounded-md border border-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-white hover:bg-white hover:text-teal-800 transition"
-                    >
-                      Mulai Berjualan
-                    </Link>
+  href={{ pathname: '/register', query: { role: 'penjual' } }}
+  prefetch={false}
+  className="rounded-md border border-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-white hover:bg-white/10 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+>
+  Mulai Berjualan
+</Link>
+
                     <Link
                       href="/login"
                       prefetch={false}
@@ -353,13 +354,13 @@ const Navbar = () => {
                       ) : (
                         <motion.div variants={mobileLinkVariants} className="mt-6 flex flex-col gap-4">
                           <Link
-                            href="/daftar-penjual"
-                            prefetch={false}
-                            onClick={() => setIsOpen(false)}
-                            className="flex w-full items-center justify-center gap-3 rounded-md border border-teal-700 bg-white py-3 font-semibold text-teal-800 hover:bg-teal-50"
-                          >
-                            <ShoppingBag size={20} /> Mulai Berjualan
-                          </Link>
+  href={{ pathname: '/register', query: { role: 'penjual' } }}
+  prefetch={false}
+  onClick={() => setIsOpen(false)}
+  className="flex w-full items-center justify-center gap-3 rounded-md border border-teal-700 bg-white py-3 font-semibold text-teal-800 hover:bg-teal-50 transition"
+>
+  <ShoppingBag size={20} /> Mulai Berjualan
+</Link>
                           <Link
                             href="/login"
                             prefetch={false}

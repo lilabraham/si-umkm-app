@@ -128,10 +128,10 @@ const HomePage: NextPage<HomePageProps> = ({ products }) => {
             </Reveal>
             <Reveal y={18} delay={0.15}>
               <Link
-                href="/misi"
+                href="/tentang-kami"
                 className="mt-6 inline-flex items-center justify-center rounded-xl border px-5 py-2.5 font-semibold text-[color:#0c6a60] border-[color:#0c6a60] hover:bg-[#0c6a60] hover:text-white transition"
               >
-                Pelajari Misi Kami
+                Pelajari Tentang Kami
               </Link>
             </Reveal>
           </div>

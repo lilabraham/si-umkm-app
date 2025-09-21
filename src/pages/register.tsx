@@ -1,11 +1,8 @@
-// src/pages/register.tsx
-import { useState, FormEvent } from 'react';
+// LOKASI FILE: src/pages/register.tsx
+import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import {
-  createUserWithEmailAndPassword,
-  updateProfile,
-} from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import {
@@ -23,6 +20,7 @@ type Role = 'pembeli' | 'penjual';
 const RegisterPage = () => {
   const router = useRouter();
 
+  // role default pembeli, bisa dipaksa ke 'penjual' via query ?role=penjual
   const [role, setRole] = useState<Role>('pembeli');
 
   const [displayName, setDisplayName] = useState('');
@@ -38,8 +36,24 @@ const RegisterPage = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // ref untuk menggeser viewport ke form penjual saat dibuka via query param
+  const sellerBlockRef = useRef<HTMLDivElement | null>(null);
+
+  // --- Auto pilih role=penjual saat datang dari CTA navbar ---
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (router.query.role === 'penjual') {
+      setRole('penjual');
+      // scroll halus ke blok penjual (tunda 1 tick agar sudah tersusun di DOM)
+      setTimeout(() => {
+        sellerBlockRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 0);
+    }
+  }, [router.isReady, router.query.role]);
+
   const handleRegister = async (e: FormEvent) => {
     e.preventDefault();
+
     if (password !== confirmPassword) {
       setError('Password dan konfirmasi password tidak cocok.');
       return;
@@ -57,7 +71,7 @@ const RegisterPage = () => {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       const user = cred.user;
 
-      // 2) Update display name (pakai nama lengkap; untuk penjual bisa tampilkan shopName di profil toko)
+      // 2) Update display name
       await updateProfile(user, { displayName });
 
       // 3) Simpan ke Firestore
@@ -66,7 +80,7 @@ const RegisterPage = () => {
         email: user.email,
         displayName,
         role,
-        // field toko (untuk pembeli biarkan string kosong agar konsisten)
+        // field toko (untuk pembeli kosong supaya konsisten tipe datanya)
         shopName: role === 'penjual' ? shopName : '',
         whatsapp: role === 'penjual' ? whatsapp : '',
         description: role === 'penjual' ? description : '',
@@ -75,7 +89,7 @@ const RegisterPage = () => {
       });
 
       // 4) Arahkan pasca-daftar
-      router.push(role === 'penjual' ? '/dashboard' : '/');
+      router.push(role === 'penjual' ? '/dashboard/index' : '/');
     } catch (err: any) {
       setError(err.message?.replace('Firebase: ', '') || 'Gagal mendaftar.');
     } finally {
@@ -157,10 +171,7 @@ const RegisterPage = () => {
                   Nama Lengkap
                 </label>
                 <div className="relative">
-                  <User
-                    size={18}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                  />
+                  <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
                     id="displayName"
                     type="text"
@@ -175,7 +186,7 @@ const RegisterPage = () => {
 
               {/* Field khusus penjual */}
               {role === 'penjual' && (
-                <>
+                <div ref={sellerBlockRef}>
                   <div>
                     <label htmlFor="shopName" className="text-sm font-medium text-gray-700 mb-1 block">
                       Nama Toko / Usaha
@@ -185,7 +196,7 @@ const RegisterPage = () => {
                       type="text"
                       value={shopName}
                       onChange={(e) => setShopName(e.target.value)}
-                      required={role === 'penjual'}
+                      required
                       className="w-full border border-gray-300 rounded-md px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-400 transition-all"
                       placeholder="Contoh: Warung Bakso Pak Kumis"
                     />
@@ -199,7 +210,7 @@ const RegisterPage = () => {
                       type="tel"
                       value={whatsapp}
                       onChange={(e) => setWhatsapp(e.target.value)}
-                      required={role === 'penjual'}
+                      required
                       className="w-full border border-gray-300 rounded-md px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-400 transition-all"
                       placeholder="08xxxxxxxxxx"
                     />
@@ -212,14 +223,14 @@ const RegisterPage = () => {
                       id="description"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      required={role === 'penjual'}
+                      required
                       rows={3}
                       className="w-full border border-gray-300 rounded-md px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-400 transition-all"
                       placeholder="Jelaskan produk yang Anda jual..."
                     />
                   </div>
                   <hr className="border-slate-200" />
-                </>
+                </div>
               )}
 
               {/* Email */}
@@ -228,10 +239,7 @@ const RegisterPage = () => {
                   Email
                 </label>
                 <div className="relative">
-                  <Mail
-                    size={18}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                  />
+                  <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
                     id="email"
                     type="email"
@@ -250,10 +258,7 @@ const RegisterPage = () => {
                   Password
                 </label>
                 <div className="relative">
-                  <Lock
-                    size={18}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                  />
+                  <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
                     id="password"
                     type="password"
@@ -268,17 +273,11 @@ const RegisterPage = () => {
 
               {/* Konfirmasi Password */}
               <div>
-                <label
-                  htmlFor="confirmPassword"
-                  className="text-sm font-medium text-gray-700 mb-1 block"
-                >
+                <label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700 mb-1 block">
                   Konfirmasi Password
                 </label>
                 <div className="relative">
-                  <Lock
-                    size={18}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                  />
+                  <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
                     id="confirmPassword"
                     type="password"

@@ -1,6 +1,6 @@
 // LOKASI FILE: src/pages/api/upload.ts
 
-import { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { v2 as cloudinary } from 'cloudinary';
 
 cloudinary.config({
@@ -17,25 +17,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // DIUBAH: Sekarang kita juga menerima 'folder' dari body request
-    const { file, folder } = req.body;
-    
-    if (!file) {
-      return res.status(400).json({ error: 'File is required.' });
-    }
+    const { folder } = (req.body ?? {}) as { folder?: string };
 
-    // Tentukan folder tujuan di Cloudinary, defaultnya 'produk-umkm'
-    const targetFolder = folder === 'profil' ? 'profil-penjual' : 'produk-umkm';
+    // Standarisasi folder
+    const targetFolder =
+      folder === 'profil' ? 'profil-penjual' : 'produk-umkm';
 
-    const uploadResponse = await cloudinary.uploader.upload(file, {
-      upload_preset: 'si-umkm-app', // PASTIKAN NAMA PRESET ANDA BENAR
-      folder: targetFolder, // Menggunakan folder yang sudah ditentukan
+    // Gunakan preset "signed" (buat di dashboard Cloudinary)
+    const uploadPreset =
+      process.env.CLOUDINARY_UPLOAD_PRESET || 'si-umkm-app';
+
+    // Parameter yang ikut ditandatangani
+    const timestamp = Math.floor(Date.now() / 1000);
+    const paramsToSign: Record<string, any> = {
+      timestamp,
+      upload_preset: uploadPreset,
+      folder: targetFolder,
+    };
+
+    const signature = cloudinary.utils.api_sign_request(
+      paramsToSign,
+      process.env.CLOUDINARY_API_SECRET as string
+    );
+
+    return res.status(200).json({
+      signature,
+      timestamp,
+      cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+      apiKey: process.env.CLOUDINARY_API_KEY,
+      folder: targetFolder,
+      uploadPreset,
     });
-
-    res.status(200).json({ secure_url: uploadResponse.secure_url });
-
-  } catch (error) {
-    console.error('Cloudinary upload error:', error);
-    res.status(500).json({ error: 'Something went wrong during the upload.' });
+  } catch (err) {
+    console.error('Create signature error:', err);
+    return res
+      .status(500)
+      .json({ error: 'Failed to create Cloudinary upload signature.' });
   }
 }

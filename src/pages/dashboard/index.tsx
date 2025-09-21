@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import withAuth from '@/components/common/withAuth';
+import SellerLayout from '@/components/layout/SellerLayout';
 
 type CategoryOption = { label: string; value: string };
 
@@ -125,22 +126,22 @@ const SellerDashboardPage: NextPage = () => {
     if (currentUser) fetchMyProducts();
   }, [currentUser]);
 
-  // ====== Upload & modal ======
-  const toBase64 = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (err) => reject(err);
-    });
+  // ====== VALIDASI & PREVIEW FILE (maks 5MB, gambar saja) ======
+  const MAX_MB = 5;
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      setError('Ukuran file maks 2MB.');
+
+    if (!file.type.startsWith('image/')) {
+      setError('Hanya gambar yang diperbolehkan (JPG, PNG, WEBP, HEIC/HEIF, AVIF, GIF, SVG).');
       return;
     }
+    if (file.size > MAX_MB * 1024 * 1024) {
+      setError(`Ukuran file maks ${MAX_MB}MB.`);
+      return;
+    }
+
     setError(null);
     setProductImageFile(file);
     setPreviewUrl(URL.createObjectURL(file));
@@ -164,6 +165,48 @@ const SellerDashboardPage: NextPage = () => {
     setCurrentProduct({ ...currentProduct, [e.target.name]: e.target.value });
   };
 
+  // ====== Direct signed upload ke Cloudinary ======
+  type SignResponse = {
+    signature: string;
+    timestamp: number;
+    cloudName: string;
+    apiKey: string;
+    folder: string;
+    uploadPreset: string;
+  };
+
+  const getSignature = async (folder: 'produk' | 'profil' = 'produk') => {
+    const r = await fetch('/api/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder }),
+    });
+    const json: any = await r.json();
+    if (!r.ok) throw new Error(json?.error || 'Gagal membuat signature upload.');
+    return json as SignResponse;
+  };
+
+  const uploadToCloudinary = async (file: File, folder: 'produk' | 'profil' = 'produk') => {
+    const { signature, timestamp, cloudName, apiKey, folder: targetFolder, uploadPreset } =
+      await getSignature(folder);
+
+    const form = new FormData();
+    form.append('file', file);
+    form.append('api_key', apiKey);
+    form.append('timestamp', String(timestamp));
+    form.append('signature', signature);
+    form.append('upload_preset', uploadPreset);
+    form.append('folder', targetFolder);
+
+    const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+    const upRes = await fetch(endpoint, { method: 'POST', body: form });
+    const up = await upRes.json();
+    if (!upRes.ok) {
+      throw new Error(up?.error?.message || 'Gagal upload gambar.');
+    }
+    return up.secure_url as string;
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
@@ -177,21 +220,15 @@ const SellerDashboardPage: NextPage = () => {
 
       let imageUrl = currentProduct.imageUrl || '';
       if (productImageFile) {
-        const b64 = await toBase64(productImageFile);
-        const uploadRes = await fetch('/api/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ file: b64, folder: 'produk' }),
-        });
-        const up = await uploadRes.json();
-        if (!uploadRes.ok) throw new Error(up.error || 'Gagal upload gambar.');
-        imageUrl = up.secure_url;
+        imageUrl = await uploadToCloudinary(productImageFile, 'produk');
       }
       if (!imageUrl && modalMode === 'add') throw new Error('Gambar produk wajib diisi.');
 
       const userRef = doc(db, 'users', currentUser.uid);
       const userDoc = await getDoc(userRef);
-      const shopName = userDoc.exists() ? (userDoc.data() as any).shopName : currentUser.displayName;
+      const shopName = userDoc.exists()
+        ? (userDoc.data() as any).shopName
+        : currentUser.displayName;
 
       const dataToSave = {
         name: currentProduct.name || '',
@@ -248,12 +285,10 @@ const SellerDashboardPage: NextPage = () => {
   };
 
   const displayName =
-    currentUser?.displayName ||
-    currentUser?.email?.split('@')[0] ||
-    'Penjual';
+    currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Penjual';
 
   return (
-    <div className="bg-[#F8F9FA] min-h-screen">
+    <SellerLayout>
       <Head>
         <title>Dashboard Penjual - SI-UMKM</title>
       </Head>
@@ -289,7 +324,7 @@ const SellerDashboardPage: NextPage = () => {
           </div>
         )}
 
-        {/* GRID: gambar besar + info singkat di bawah */}
+        {/* GRID: kartu produk */}
         <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5">
           {isLoading ? (
             <div className="flex h-52 items-center justify-center">
@@ -300,7 +335,7 @@ const SellerDashboardPage: NextPage = () => {
               {myProducts.map((p) => (
                 <div
                   key={p.id}
-                  className="relative overflow-hidden rounded-2xl ring-1 ring-slate-200 bg-white shadow-sm hover:shadow-md transition"
+                  className="relative overflow-hidden rounded-2xl ring-1 ring-slate-200 bg-white shadow-sm transition hover:shadow-md"
                 >
                   {/* Kebab */}
                   <div className="absolute right-2 top-2 z-10">
@@ -342,7 +377,7 @@ const SellerDashboardPage: NextPage = () => {
                     </AnimatePresence>
                   </div>
 
-                  {/* Gambar tetap dominan (rasio konsisten) */}
+                  {/* Gambar */}
                   <div className="relative w-full">
                     <div className="aspect-[4/3] w-full">
                       {p.imageUrl ? (
@@ -361,7 +396,7 @@ const SellerDashboardPage: NextPage = () => {
                     </div>
                   </div>
 
-                  {/* Info singkat (nama, harga, kategori) */}
+                  {/* Info singkat */}
                   <div className="p-3">
                     <h3 className="truncate text-sm font-semibold text-slate-900">{p.name}</h3>
                     <div className="mt-0.5 text-[13px] font-semibold text-blue-600">
@@ -470,6 +505,7 @@ const SellerDashboardPage: NextPage = () => {
                     </div>
                   </div>
 
+                  {/* Deskripsi */}
                   <div>
                     <label htmlFor="description" className="text-sm font-medium text-slate-700">
                       Deskripsi
@@ -540,7 +576,7 @@ const SellerDashboardPage: NextPage = () => {
           )}
         </AnimatePresence>
       </div>
-    </div>
+    </SellerLayout>
   );
 };
 

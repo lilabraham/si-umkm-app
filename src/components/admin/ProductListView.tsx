@@ -1,30 +1,72 @@
 // LOKASI FILE: src/components/admin/ProductListView.tsx
-import Image from 'next/image';
-import { Search, Filter, RotateCw, Edit2, Trash2 } from 'lucide-react';
+import React from "react";
+import Image from "next/image";
+import {
+  Search,
+  Filter,
+  ChevronDown,
+  RotateCcw,
+  Check,
+  Edit2,
+  Trash2,
+} from "lucide-react";
 
+/* ===================== Types & Props ===================== */
 export type ProductListItem = {
   id: string;
   name: string;
   description?: string;
   photoURL?: string;
   sellerName: string;
-  category?: string;
-  price: number; // rupiah (integer)
+  category: string;
+  price: number;
 };
 
 export type Option = { value: string; label: string };
 
 export type Filters = {
   q: string;
-  sellerId: string;   // '' = semua
-  category: string;   // '' = semua
+  sellerId: string;
+  category: string;
 };
 
-export default function ProductListView({
+type Props = {
+  items: ProductListItem[];
+  loading?: boolean;
+
+  // filters & actions
+  filters: Filters;
+  sellerOptions: Option[];
+  categoryOptions: Option[];
+  onChangeFilters: (patch: Partial<Filters>) => void;
+  onApply: () => void;
+  onReset: () => void;
+
+  // table actions
+  onEdit: (id: string) => void;
+  onDelete: (id: string) => void;
+
+  // pagination
+  page: number;
+  totalPages: number;
+  onPrevPage: () => void;
+  onNextPage: () => void;
+};
+
+/* ===================== Helpers ===================== */
+const rupiah = (n: number) =>
+  "Rp " + (Number(n || 0)).toLocaleString("id-ID");
+
+const Pill = ({ children }: { children: React.ReactNode }) => (
+  <span className="inline-flex items-center rounded-full bg-slate-100 text-slate-700 px-2.5 py-1 text-xs">
+    {children}
+  </span>
+);
+
+/* ===================== Component ===================== */
+const ProductListView: React.FC<Props> = ({
   items,
-  loading = false,
-  page,
-  totalPages,
+  loading,
   filters,
   sellerOptions,
   categoryOptions,
@@ -33,58 +75,34 @@ export default function ProductListView({
   onReset,
   onEdit,
   onDelete,
+  page,
+  totalPages,
   onPrevPage,
   onNextPage,
-}: {
-  items: ProductListItem[];
-  loading?: boolean;
-  page: number;
-  totalPages: number;
-  filters: Filters;
-  sellerOptions: Option[];
-  categoryOptions: Option[];
-  onChangeFilters: (patch: Partial<Filters>) => void;
-  onApply: () => void;
-  onReset: () => void;
-  onEdit: (id: string) => void;
-  onDelete: (id: string) => void;
-  onPrevPage: () => void;
-  onNextPage: () => void;
-}) {
-  const formatIDR = (n: number) =>
-    new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      maximumFractionDigits: 0,
-    }).format(n);
-
-  const hasItems = items.length > 0;
-
+}) => {
   return (
-    <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="rounded-2xl border bg-white p-3 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center">
-          {/* Search */}
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+    <div className="rounded-xl bg-white shadow-[0_8px_24px_rgba(0,0,0,0.06)] ring-1 ring-black/5">
+      {/* ================== FILTER BAR ================== */}
+      <div className="border-b border-slate-200 p-4 md:p-5">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto_auto_auto_auto] md:items-center">
+          {/* search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
               value={filters.q}
               onChange={(e) => onChangeFilters({ q: e.target.value })}
-              placeholder="Cari produk…"
-              className="w-full rounded-xl border-slate-300 pl-10 pr-3 py-2.5 text-sm focus:border-blue-500 focus:ring-blue-500"
+              placeholder="Cari produk..."
+              className="w-full rounded-lg border border-slate-300 pl-9 pr-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
-          {/* Seller */}
-          <div className="relative w-full md:w-64">
-            <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-              <Filter size={18} />
-            </div>
+          {/* seller */}
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <select
               value={filters.sellerId}
               onChange={(e) => onChangeFilters({ sellerId: e.target.value })}
-              className="w-full rounded-xl border-slate-300 pl-10 pr-3 py-2.5 text-sm focus:border-blue-500 focus:ring-blue-500"
+              className="w-full appearance-none rounded-lg border border-slate-300 pl-9 pr-8 py-2.5 text-sm focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Semua penjual</option>
               {sellerOptions.map((o) => (
@@ -93,14 +111,16 @@ export default function ProductListView({
                 </option>
               ))}
             </select>
+            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           </div>
 
-          {/* Kategori */}
-          <div className="relative w-full md:w-64">
+          {/* category */}
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <select
               value={filters.category}
               onChange={(e) => onChangeFilters({ category: e.target.value })}
-              className="w-full rounded-xl border-slate-300 pl-3 pr-3 py-2.5 text-sm focus:border-blue-500 focus:ring-blue-500"
+              className="w-full appearance-none rounded-lg border border-slate-300 pl-9 pr-8 py-2.5 text-sm focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Semua kategori</option>
               {categoryOptions.map((o) => (
@@ -109,80 +129,179 @@ export default function ProductListView({
                 </option>
               ))}
             </select>
+            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-2 md:ml-auto">
-            <button
-              onClick={onApply}
-              className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-            >
-              Terapkan
-            </button>
-            <button
-              onClick={onReset}
-              title="Reset filter"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-            >
-              <RotateCw size={16} /> Reset
-            </button>
-          </div>
+          {/* apply */}
+          <button
+            onClick={onApply}
+            className="rounded-lg bg-blue-600 text-white text-sm font-semibold py-2.5 px-4 hover:bg-blue-700"
+          >
+            Terapkan
+          </button>
+
+          {/* reset */}
+          <button
+            onClick={onReset}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-100 text-slate-700 text-sm font-semibold py-2.5 px-4 hover:bg-slate-200"
+          >
+            <RotateCcw className="h-4 w-4" /> Reset
+          </button>
         </div>
       </div>
 
-      {/* List */}
-      <div className="overflow-hidden rounded-2xl border bg-white shadow-sm">
-        {/* Header sticky (tetap blur, tapi tidak tembus ke row pertama) */}
-        <div className="sticky top-16 z-30">
-          <div className="relative border-b">
-            {/* Overlay: hampir-opaque + blur → baris pertama tidak “menabrak”, blur tetap ada */}
-            <div className="absolute inset-0 backdrop-blur-md bg-white/98 supports-[backdrop-filter]:bg-white/85"></div>
-            <div className="relative px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
-              <div className="grid grid-cols-12 gap-3">
-                <div className="col-span-6">Produk</div>
-                <div className="col-span-2">Toko</div>
-                <div className="col-span-2">Kategori</div>
-                <div className="col-span-1 text-right">Harga</div>
-                <div className="col-span-1 text-right">Aksi</div>
-              </div>
-            </div>
+      {/* ================== TABLE ================== */}
+      <div className="p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full table-fixed">
+            {/* Kolom fixed agar header & body selaras */}
+            <colgroup>
+              <col className="w-[48%]" />
+              <col className="w-[22%]" />
+              <col className="w-[15%]" />
+              <col className="w-[10%]" />
+              <col className="w-[5%]" />
+            </colgroup>
+
+            <thead className="bg-[#F8F9FA] border-b border-slate-200">
+              <tr>
+                {["PRODUK", "TOKO", "KATEGORI", "HARGA", "AKSI"].map((h) => (
+                  <th
+                    key={h}
+                    className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-600"
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-slate-200 bg-white">
+              {loading ? (
+                [...Array(5)].map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-11 w-11 rounded-full bg-slate-200" />
+                        <div className="space-y-2">
+                          <div className="h-3 w-44 bg-slate-200 rounded" />
+                          <div className="h-2.5 w-28 bg-slate-200 rounded" />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="h-3 w-32 bg-slate-200 rounded" />
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="h-6 w-20 bg-slate-200 rounded-full" />
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="h-3 w-20 bg-slate-200 rounded" />
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex gap-2 justify-end">
+                        <div className="h-8 w-8 bg-slate-200 rounded-md" />
+                        <div className="h-8 w-8 bg-slate-200 rounded-md" />
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : items.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-500">
+                    Tidak ada data.
+                  </td>
+                </tr>
+              ) : (
+                items.map((p) => (
+                  <tr key={p.id} className="hover:bg-slate-50/60">
+                    {/* PRODUK */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-11 w-11 relative">
+                          {p.photoURL ? (
+                            <Image
+                              src={p.photoURL}
+                              alt={p.name}
+                              fill
+                              sizes="44px"
+                              className="rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="h-11 w-11 rounded-full bg-slate-100" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="truncate font-semibold text-slate-900">
+                            {p.name}
+                          </div>
+                          {p.description ? (
+                            <div className="truncate text-[12px] text-slate-500">
+                              {p.description}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* TOKO */}
+                    <td className="px-4 py-3 align-top">
+                      <div className="truncate text-slate-800">{p.sellerName}</div>
+                    </td>
+
+                    {/* KATEGORI */}
+                    <td className="px-4 py-3 align-top">
+                      {p.category ? <Pill>{p.category}</Pill> : <span className="text-slate-400">-</span>}
+                    </td>
+
+                    {/* HARGA */}
+                    <td className="px-4 py-3 align-top">
+                      <div className="font-semibold text-slate-900">{rupiah(p.price)}</div>
+                    </td>
+
+                    {/* AKSI */}
+                    <td className="px-4 py-3 align-top">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => onEdit(p.id)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 hover:bg-slate-100"
+                          title="Edit"
+                        >
+                          <Edit2 className="h-4 w-4 text-slate-700" />
+                        </button>
+                        <button
+                          onClick={() => onDelete(p.id)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 hover:bg-red-50"
+                          title="Hapus"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-600" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* ================== PAGINATION ================== */}
+        <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200">
+          <div className="text-sm text-slate-600">
+            Halaman <b>{page}</b> dari <b>{totalPages}</b>
           </div>
-        </div>
-
-        {/* Body */}
-        <div className="divide-y divide-slate-100">
-          {loading
-            ? Array.from({ length: 5 }).map((_, i) => <RowSkeleton key={i} />)
-            : hasItems
-            ? items.map((p) => (
-                <Row
-                  key={p.id}
-                  p={p}
-                  onEdit={() => onEdit(p.id)}
-                  onDelete={() => onDelete(p.id)}
-                  formatIDR={formatIDR}
-                />
-              ))
-            : <EmptyState />}
-        </div>
-
-        {/* Footer / Pagination */}
-        <div className="flex items-center justify-between bg-slate-50 px-4 py-3">
-          <p className="text-xs text-slate-500">
-            Halaman {page} dari {Math.max(totalPages, 1)}
-          </p>
           <div className="flex items-center gap-2">
             <button
               onClick={onPrevPage}
+              className="rounded-lg bg-slate-100 text-slate-700 text-sm font-medium px-3 py-2 hover:bg-slate-200 disabled:opacity-50"
               disabled={page <= 1}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 enabled:hover:bg-slate-50 disabled:opacity-50"
             >
               Sebelumnya
             </button>
             <button
               onClick={onNextPage}
+              className="rounded-lg bg-slate-100 text-slate-700 text-sm font-medium px-3 py-2 hover:bg-slate-200 disabled:opacity-50"
               disabled={page >= totalPages}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 enabled:hover:bg-slate-50 disabled:opacity-50"
             >
               Berikutnya
             </button>
@@ -191,98 +310,6 @@ export default function ProductListView({
       </div>
     </div>
   );
-}
+};
 
-/* ---------- Sub-komponen ---------- */
-
-function Row({
-  p,
-  onEdit,
-  onDelete,
-  formatIDR,
-}: {
-  p: ProductListItem;
-  onEdit: () => void;
-  onDelete: () => void;
-  formatIDR: (n: number) => string;
-}) {
-  return (
-    <div className="grid grid-cols-12 gap-3 px-4 py-3 hover:bg-slate-50">
-      {/* Produk */}
-      <div className="col-span-6 flex items-center gap-3">
-        <div className="relative h-12 w-12 overflow-hidden rounded-lg border bg-slate-100">
-          {p.photoURL ? <Image src={p.photoURL} alt={p.name} fill className="object-cover" /> : null}
-        </div>
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-slate-900">{p.name}</div>
-          {p.description ? <div className="truncate text-xs text-slate-500">{p.description}</div> : null}
-        </div>
-      </div>
-
-      {/* Toko */}
-      <div className="col-span-2 self-center text-sm text-slate-700">{p.sellerName || '—'}</div>
-
-      {/* Kategori */}
-      <div className="col-span-2 self-center">
-        {p.category ? (
-          <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
-            {p.category}
-          </span>
-        ) : (
-          <span className="text-sm text-slate-400">—</span>
-        )}
-      </div>
-
-      {/* Harga */}
-      <div className="col-span-1 self-center text-right text-sm font-semibold tabular-nums text-slate-900">
-        {formatIDR(p.price)}
-      </div>
-
-      {/* Aksi */}
-      <div className="col-span-1 self-center">
-        <div className="flex justify-end gap-1.5">
-          <button
-            onClick={onEdit}
-            title="Edit"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-          >
-            <Edit2 size={16} />
-          </button>
-          <button
-            onClick={onDelete}
-            title="Hapus"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-rose-50 hover:text-rose-600"
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function RowSkeleton() {
-  return (
-    <div className="grid grid-cols-12 gap-3 px-4 py-3 animate-pulse">
-      <div className="col-span-6 flex items-center gap-3">
-        <div className="h-12 w-12 rounded-lg bg-slate-200" />
-        <div className="space-y-2">
-          <div className="h-3 w-40 rounded bg-slate-200" />
-          <div className="h-3 w-28 rounded bg-slate-200" />
-        </div>
-      </div>
-      <div className="col-span-2 self-center h-3 w-24 rounded bg-slate-200" />
-      <div className="col-span-2 self-center h-5 w-20 rounded-full bg-slate-200" />
-      <div className="col-span-1 self-center h-3 w-16 rounded bg-slate-200 justify-self-end" />
-      <div className="col-span-1 self-center h-8 w-8 rounded-lg bg-slate-200 justify-self-end" />
-    </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="px-6 py-12 text-center text-slate-500">
-      Belum ada produk yang cocok dengan filter.
-    </div>
-  );
-}
+export default ProductListView;

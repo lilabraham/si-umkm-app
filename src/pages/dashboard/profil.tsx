@@ -22,8 +22,7 @@ interface ProfileData {
 }
 
 const SellerProfilePage: NextPage = () => {
-  const { currentUser, refreshUser } = useAuth(); // <— AMBIL refreshUser
-
+  const { currentUser, refreshUser } = useAuth();
 
   const [formData, setFormData] = useState<ProfileData>({
     shopName: '',
@@ -57,29 +56,70 @@ const SellerProfilePage: NextPage = () => {
     fetchProfile();
   }, [currentUser]);
 
-  // ───────────────────────────────── util
-  const toBase64 = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const r = new FileReader();
-      r.readAsDataURL(file);
-      r.onload = () => resolve(r.result as string);
-      r.onerror = (e) => reject(e);
-    });
+  // ───────────────────────────────── VALIDASI FILE (gambar saja, maks 5MB)
+  const MAX_MB = 5;
 
-  // ───────────────────────────────── handlers
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      setMessage({ type: 'error', text: 'Ukuran file maks 2MB.' });
+
+    if (!file.type.startsWith('image/')) {
+      setMessage({ type: 'error', text: 'Hanya gambar yang diperbolehkan (JPG, PNG, WEBP, HEIC/HEIF, AVIF, GIF, SVG).' });
       return;
     }
+    if (file.size > MAX_MB * 1024 * 1024) {
+      setMessage({ type: 'error', text: `Ukuran file maks ${MAX_MB}MB.` });
+      return;
+    }
+
+    setMessage(null);
     setImageFile(file);
     setPreviewUrl(URL.createObjectURL(file));
   };
 
   const handleFormChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData((s) => ({ ...s, [e.target.name]: e.target.value }));
+  };
+
+  // ───────────────────────────────── Signed direct upload ke Cloudinary
+  type SignResponse = {
+    signature: string;
+    timestamp: number;
+    cloudName: string;
+    apiKey: string;
+    folder: string;
+    uploadPreset: string;
+  };
+
+  const getSignature = async (folder: 'produk' | 'profil' = 'profil') => {
+    const r = await fetch('/api/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder }),
+    });
+    const json: any = await r.json();
+    if (!r.ok) throw new Error(json?.error || 'Gagal membuat signature upload.');
+    return json as SignResponse;
+  };
+
+  const uploadToCloudinary = async (file: File) => {
+    const { signature, timestamp, cloudName, apiKey, folder, uploadPreset } = await getSignature('profil');
+
+    const form = new FormData();
+    form.append('file', file);
+    form.append('api_key', apiKey);
+    form.append('timestamp', String(timestamp));
+    form.append('signature', signature);
+    form.append('upload_preset', uploadPreset);
+    form.append('folder', folder);
+
+    const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+    const upRes = await fetch(endpoint, { method: 'POST', body: form });
+    const up = await upRes.json();
+    if (!upRes.ok) {
+      throw new Error(up?.error?.message || 'Gagal upload gambar.');
+    }
+    return up.secure_url as string;
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -90,15 +130,8 @@ const SellerProfilePage: NextPage = () => {
     try {
       let finalImageUrl = formData.shopImageUrl || '';
       if (imageFile) {
-        const fileBase64 = await toBase64(imageFile);
-        const uploadRes = await fetch('/api/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ file: fileBase64, folder: 'profil' }),
-        });
-        const uploadData = await uploadRes.json();
-        if (!uploadRes.ok) throw new Error(uploadData.error || 'Gagal upload gambar.');
-        finalImageUrl = uploadData.secure_url;
+        // Upload langsung ke Cloudinary (signed)
+        finalImageUrl = await uploadToCloudinary(imageFile);
       }
 
       const userDocRef = doc(db, 'users', currentUser.uid);
@@ -115,7 +148,7 @@ const SellerProfilePage: NextPage = () => {
         photoURL: finalImageUrl || currentUser.photoURL || undefined,
       });
 
-    await refreshUser();
+      await refreshUser();
 
       setMessage({ type: 'success', text: 'Profil berhasil diperbarui!' });
     } catch (err: any) {
@@ -199,7 +232,9 @@ const SellerProfilePage: NextPage = () => {
                   {formData.shopName || 'Nama Toko'}
                 </p>
                 <p className="text-xs text-slate-500">{currentUser?.email}</p>
-                <p className="mt-3 text-[11px] text-slate-400">PNG, JPG, WEBP — maks 2MB</p>
+                <p className="mt-3 text-[11px] text-slate-400">
+                  JPG, PNG, WEBP (dan format gambar lain) — maks 5MB
+                </p>
               </div>
 
               {/* KANAN – form compact (lebar sedang) */}

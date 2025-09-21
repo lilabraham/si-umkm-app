@@ -6,6 +6,8 @@ import Papa from "papaparse";
 import { motion } from "framer-motion";
 import { Package, Store, Layers } from "lucide-react";
 
+import AdminLayout from "@/components/layout/AdminLayout"; // ⬅️ DITAMBAHKAN
+
 import {
   CategoryCsv,
   ShopCsv,
@@ -35,7 +37,6 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
       return { redirect: { destination: "/login?next=/admin/analytics", permanent: false } };
     }
 
-    // Dynamic import: aman hanya di server
     const { getAuth, getFirestore } = await import("@/lib/firebaseAdmin");
     const adminAuth = getAuth();
     const db = getFirestore();
@@ -124,7 +125,7 @@ const buildCategoryMap = (cats: CategoryCsv[]) => {
   return map;
 };
 
-// >>> TIPE LOKAL: menambahkan 'visibility' ke PublicProduct agar aman dipakai di file ini
+// >>> TIPE LOKAL
 type ProductWithVisibility = PublicProduct & { visibility?: string | null };
 
 /* =================== Halaman =================== */
@@ -189,7 +190,7 @@ const AnalyticsPage: NextPage = () => {
     });
   }, [productsRaw, categoriesMap]);
 
-  // Produk dengan harga valid untuk histogram/boxplot
+  // Produk dengan harga valid
   const productsWithPrice: ProductWithVisibility[] = useMemo(
     () => productsAll.filter((p) => Number.isFinite(p.price) && p.price >= 0),
     [productsAll]
@@ -201,7 +202,6 @@ const AnalyticsPage: NextPage = () => {
   const totalKategori = categories.length;
 
   /* =================== Agregasi =================== */
-  // Frekuensi per kategori: hanya produk public/kosong
   const freqRows = useMemo(() => {
     const publicOnly = productsAll.filter((p) => isPublic(p.visibility));
     const counts = countBy(publicOnly, (p) => p.category);
@@ -209,7 +209,6 @@ const AnalyticsPage: NextPage = () => {
     return toFrequencyRows(counts);
   }, [productsAll]);
 
-  // Histogram & Boxplot: pakai harga valid
   const bins = useMemo(() => histogram(productsWithPrice.map((p) => p.price), 10), [productsWithPrice]);
   const boxes = useMemo(() => boxplotByCategory(productsWithPrice), [productsWithPrice]);
 
@@ -223,7 +222,7 @@ const AnalyticsPage: NextPage = () => {
   const isLoading = state === "loading";
 
   return (
-    <>
+    <AdminLayout /* opsional: bisa beri prop active="analytics" kalau layout mendukung */>
       <Head>
         <title>Admin Analytics | UMKM Randudongkal</title>
       </Head>
@@ -308,7 +307,7 @@ const AnalyticsPage: NextPage = () => {
           diikutkan pada histogram/boxplot agar visual tetap representatif.
         </p>
       </main>
-    </>
+    </AdminLayout>
   );
 };
 

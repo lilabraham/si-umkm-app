@@ -18,7 +18,7 @@ const Footer = () => {
   const navLinks = [
     { name: 'Beranda', href: '/' },
     { name: 'Produk', href: '/produk' },
-    { name: 'Tentang Kami', href: '/tentang' },
+    { name: 'Tentang Kami', href: '/tentang-kami' },
   ];
 
   return (
